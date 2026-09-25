@@ -39,65 +39,92 @@ def upload_to_supabase_storage(user_id: str, resource_id: int, file: UploadFile)
     return storage_path
 
 
+MAX_SIZE = 50 * 1024 * 1024
+ALLOWED_EXTENSIONS = {".pdf", ".txt", ".pptx", ".docx"}
+
+async def read_bounded(file: UploadFile, max_bytes: int) -> bytes:
+    chunks = []
+    total = 0
+    while True:
+        chunk = await file.read(1024 * 1024)
+        if not chunk:
+            break
+        total += len(chunk)
+        if total > max_bytes:
+            raise HTTPException(413, "File too large")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+from app.core.auth import get_current_profile
+
 @router.post("/", response_model=resource_schema.Resource)
-def create_resource(
+async def create_resource(
     title: str = Form(...),
     description: Optional[str] = Form(None),
     visibility: str = Form("PRIVATE"),
-    owner_id: str = Form(...),
     file: UploadFile = File(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    profile: models.User = Depends(get_current_profile)
 ):
-    # Ensure user exists in local DB
-    user = db.query(models.User).filter(models.User.id == owner_id).first()
+    import uuid
+    import mimetypes
+
+    # 1. Bounded read
+    file_bytes = await read_bounded(file, MAX_SIZE)
+    file_size = len(file_bytes)
+    
+    # Check extension
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(415, f"Unsupported file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}")
+
+    checksum = hashlib.sha256(file_bytes).hexdigest()
+    
+    # 2. Storage First (P0.7 UUID key & P0.13 Storage-first)
+    storage_key = f"resources/{uuid.uuid4()}{ext}"
+    storage_path = None
+    
+    if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
+        try:
+            supabase = get_supabase()
+            supabase.storage.from_(STORAGE_BUCKET).upload(
+                path=storage_key,
+                file=file_bytes,
+                file_options={"content-type": file.content_type or mimetypes.guess_type(file.filename)[0] or "application/octet-stream"}
+            )
+            storage_path = storage_key
+        except Exception as e:
+            print(f"[WARN] Supabase Storage upload failed: {e}. Falling back to local.")
+            
+    if not storage_path:
+        local_path = os.path.join(UPLOAD_DIR, storage_key.replace("/", "_"))
+        with open(local_path, "wb") as f:
+            f.write(file_bytes)
+        storage_path = local_path
+
+    # Ensure user exists in local DB (Temporary for dev)
+    user = db.query(models.User).filter(models.User.id == profile.id).first()
     if not user:
         user = models.User(
-            id=owner_id,
+            id=profile.id,
             full_name="Faculty Member",
-            employee_id=owner_id,
-            official_email=f"{owner_id}@institution.edu"
+            employee_id=profile.id,
+            official_email=f"{profile.id}@institution.edu"
         )
         db.add(user)
         db.commit()
 
-    # Create resource record first (to get the ID)
+    # 3. THEN the DB transaction
     db_resource = models.Resource(
         title=title,
         description=description,
         visibility=visibility,
-        owner_id=owner_id
+        owner_id=profile.id
     )
     db.add(db_resource)
     db.commit()
     db.refresh(db_resource)
 
-    # Read file content for checksum
-    file_bytes = file.file.read()
-    file_size = len(file_bytes)
-    checksum = hashlib.md5(file_bytes).hexdigest()
-
-    # Try Supabase Storage, fall back to local
-    storage_path = None
-    if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
-        try:
-            supabase = get_supabase()
-            remote_path = f"{owner_id}/{db_resource.id}/{file.filename}"
-            supabase.storage.from_(STORAGE_BUCKET).upload(
-                path=remote_path,
-                file=file_bytes,
-                file_options={"content-type": file.content_type or "application/octet-stream"}
-            )
-            storage_path = remote_path
-        except Exception as e:
-            print(f"[WARN] Supabase Storage upload failed: {e}. Falling back to local.")
-
-    if not storage_path:
-        local_path = os.path.join(UPLOAD_DIR, f"{db_resource.id}_{file.filename}")
-        with open(local_path, "wb") as f:
-            f.write(file_bytes)
-        storage_path = local_path
-
-    # Create version 1 (immutable)
     db_version = models.ResourceVersion(
         resource_id=db_resource.id,
         version_number=1,
@@ -106,7 +133,7 @@ def create_resource(
         mime_type=file.content_type,
         checksum=checksum,
         status="PUBLISHED",
-        created_by=owner_id
+        created_by=profile.id
     )
     db.add(db_version)
     db.commit()
@@ -124,6 +151,9 @@ def list_resources(
     return resources
 
 
+from fastapi.responses import FileResponse, StreamingResponse
+import io
+
 @router.get("/{resource_id}", response_model=resource_schema.Resource)
 def get_resource(resource_id: int, db: Session = Depends(get_db)):
     resource = db.query(models.Resource).filter(models.Resource.id == resource_id).first()
@@ -131,16 +161,46 @@ def get_resource(resource_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Resource not found")
     return resource
 
+@router.get("/{resource_id}/download")
+def download_resource(resource_id: int, db: Session = Depends(get_db)):
+    resource = db.query(models.Resource).filter(models.Resource.id == resource_id).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    
+    latest_version = None
+    if resource.versions:
+        latest_version = sorted(resource.versions, key=lambda v: v.version_number, reverse=True)[0]
+        
+    if not latest_version or not latest_version.storage_path:
+        raise HTTPException(status_code=404, detail="File not found")
+        
+    path = latest_version.storage_path
+    
+    # Local fallback path check
+    if os.path.exists(path):
+        original_filename = path.split("_", 1)[-1] if "_" in os.path.basename(path) else os.path.basename(path)
+        return FileResponse(path, filename=original_filename, media_type=latest_version.mime_type or "application/octet-stream")
+        
+    # Supabase fetch
+    try:
+        supabase = get_supabase()
+        res = supabase.storage.from_(STORAGE_BUCKET).download(path)
+        return StreamingResponse(io.BytesIO(res), media_type=latest_version.mime_type or "application/octet-stream", headers={
+            "Content-Disposition": f'attachment; filename="{os.path.basename(path)}"'
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to download from storage: {e}")
+
 
 @router.delete("/{resource_id}")
 def delete_resource(
     resource_id: int,
-    owner_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    profile: models.User = Depends(get_current_profile)
 ):
     resource = db.query(models.Resource).filter(
         models.Resource.id == resource_id,
-        models.Resource.owner_id == owner_id
+        models.Resource.owner_id == profile.id
     ).first()
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found or not owned by you")
@@ -153,8 +213,8 @@ def delete_resource(
 def create_resource_version(
     resource_id: int,
     version: resource_schema.ResourceVersionCreate,
-    user_id: str,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    profile: models.User = Depends(get_current_profile)
 ):
     resource = db.query(models.Resource).filter(models.Resource.id == resource_id).first()
     if not resource:
@@ -169,7 +229,7 @@ def create_resource_version(
         mime_type=version.mime_type,
         change_note=version.change_note,
         status=version.status,
-        created_by=user_id
+        created_by=profile.id
     )
     db.add(db_version)
     db.commit()

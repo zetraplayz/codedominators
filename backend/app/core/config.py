@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    SUPABASE_JWT_SECRET: str = os.getenv("SUPABASE_JWT_SECRET", "dummy_secret_for_dev")
     
     SECRET_KEY: str = os.getenv("SECRET_KEY", "MESH_super_secret_key_2026")
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")

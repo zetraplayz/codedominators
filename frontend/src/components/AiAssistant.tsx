@@ -48,8 +48,12 @@ export function AiAssistant({ resourceContext }: { resourceContext?: string }) {
       if (res.ok) {
         const data = await res.json();
         setMessages([...newHistory, { role: 'model', content: data.answer }]);
+      } else if (res.status === 503) {
+        setMessages([...newHistory, { role: 'model', content: '⚠️ AI service is not configured yet. Add your GEMINI_API_KEY to backend/.env and restart the server.' }]);
+      } else if (res.status === 429) {
+        setMessages([...newHistory, { role: 'model', content: '⏳ Rate limit reached on all API keys. Please wait a moment and try again.' }]);
       } else {
-        setMessages([...newHistory, { role: 'model', content: 'Sorry, I encountered an error. Please try again.' }]);
+        setMessages([...newHistory, { role: 'model', content: 'Something went wrong. Please try again.' }]);
       }
     } catch {
       setMessages([...newHistory, { role: 'model', content: 'Cannot reach the AI service. Make sure the backend is running.' }]);

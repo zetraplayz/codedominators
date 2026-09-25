@@ -6,4 +6,7 @@ pydantic-settings
 python-dotenv
 supabase
 python-multipart
-google-generativeai
+google-genai
+openai
+PyJWT
+python-magic-bin

@@ -85,6 +85,29 @@ export default function ResourcesPage() {
     }
   };
 
+  const handleDownload = (id: number) => {
+    window.open(`${API}/api/resources/${id}/download`, '_blank');
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this resource?')) return;
+    try {
+      const res = await fetch(`${API}/api/resources/${id}`, { 
+        method: 'DELETE',
+        headers: {
+          'Authorization': 'Bearer DEV_TOKEN'
+        }
+      });
+      if (res.ok) {
+        fetchResources();
+      } else {
+        alert('Failed to delete resource.');
+      }
+    } catch {
+      alert('Network error while deleting.');
+    }
+  };
+
   const displayed = displayedIds === null
     ? resources
     : displayedIds.map(id => resources.find(r => r.id === id)).filter(Boolean) as Resource[];
@@ -186,11 +209,28 @@ export default function ResourcesPage() {
                 </p>
               </div>
 
-              <div className="flex items-center justify-between pt-3 border-t border-[var(--color-base-text)]/10">
+              <div className="flex items-center justify-between pt-3 border-t border-[var(--color-base-text)]/10 relative">
                 <VisibilityBadge v={resource.visibility} />
-                <button className="p-2 rounded-xl bg-[var(--color-base-bg)] shadow-clay-btn hover:shadow-clay-pressed text-[var(--color-base-text)] opacity-60 hover:opacity-100 transition-all">
-                  <Download size={16} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => handleDownload(resource.id)} className="p-2 rounded-xl bg-[var(--color-base-bg)] shadow-clay-btn hover:shadow-clay-pressed text-[var(--color-base-text)] opacity-60 hover:opacity-100 transition-all" title="Download Resource">
+                    <Download size={16} />
+                  </button>
+                  {resource.owner_id === session.id && (
+                    <button className="p-2 rounded-xl bg-[var(--color-base-bg)] shadow-clay-btn hover:shadow-clay-pressed text-[var(--color-base-text)] opacity-60 hover:opacity-100 transition-all group relative" title="Options">
+                      <div className="w-4 flex justify-between items-center px-0.5">
+                        <span className="w-1 h-1 rounded-full bg-current"></span>
+                        <span className="w-1 h-1 rounded-full bg-current"></span>
+                        <span className="w-1 h-1 rounded-full bg-current"></span>
+                      </div>
+                      
+                      {/* Dropdown Menu (Hover based for now) */}
+                      <div className="absolute bottom-full right-0 mb-2 w-32 bg-[var(--color-base-mint)] shadow-clay-card rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all flex flex-col overflow-hidden border border-white/20 z-10">
+                        <div className="px-4 py-2.5 text-xs font-bold text-[var(--color-base-text)] hover:bg-[var(--color-base-bg)] transition-colors text-left border-b border-white/10" onClick={() => alert('Edit is coming soon!')}>Edit details</div>
+                        <div className="px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors text-left" onClick={() => handleDelete(resource.id)}>Delete</div>
+                      </div>
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))}

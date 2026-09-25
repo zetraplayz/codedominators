@@ -33,11 +33,13 @@ export function UploadResourceModal({ isOpen, onClose, onUploadSuccess, userId =
       formData.append('title', title);
       formData.append('description', description);
       formData.append('visibility', visibility);
-      formData.append('owner_id', userId);
       formData.append('file', file);
 
       const response = await fetch(`${API}/api/resources/`, {
         method: 'POST',
+        headers: {
+          'Authorization': 'Bearer DEV_TOKEN'
+        },
         body: formData,
       });
 

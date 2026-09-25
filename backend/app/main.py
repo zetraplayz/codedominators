@@ -1,7 +1,10 @@
+import os
+from dotenv import load_dotenv
+load_dotenv()
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api import resources, ai
-
 app = FastAPI(
     title="Connect Plus API",
     description="Backend API for Connect Plus - Institutional Faculty Resource Platform",
