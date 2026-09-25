@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     SUPABASE_KEY: str = os.getenv("SUPABASE_KEY", "")
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./connect_plus.db")
     
+    GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+    SUPABASE_SERVICE_ROLE_KEY: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    
     SECRET_KEY: str = os.getenv("SECRET_KEY", "MESH_super_secret_key_2026")
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     

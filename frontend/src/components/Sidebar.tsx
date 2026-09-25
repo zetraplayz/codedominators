@@ -16,10 +16,13 @@ export default function Sidebar() {
   ];
 
   return (
-    <aside className="w-64 min-h-screen bg-[#F0F3F8] shadow-[10px_10px_20px_#d1d5db,-10px_-10px_20px_#ffffff] flex flex-col items-center py-8">
+    <aside className="w-64 min-h-screen bg-[var(--color-base-bg)] shadow-clay-card flex flex-col items-center py-8 z-10 relative">
       {/* Logo */}
-      <div className="text-2xl font-bold text-gray-800 mb-12 tracking-tight">
-        Connect Plus
+      <div className="flex flex-col items-center mb-12">
+        <img src="/logo.png" alt="Connect Plus Logo" className="w-16 h-16 drop-shadow-md mb-2" />
+        <div className="text-xl font-bold text-[var(--color-base-text)] tracking-tight">
+          Connect Plus
+        </div>
       </div>
 
       {/* Nav Links */}
@@ -34,8 +37,8 @@ export default function Sidebar() {
               href={item.href}
               className={`flex items-center space-x-3 px-4 py-3 rounded-2xl transition-all duration-300 font-medium ${
                 isActive
-                  ? "bg-[#E6E9F0] shadow-[inset_4px_4px_8px_#c8ccd4,inset_-4px_-4px_8px_#ffffff] text-blue-600"
-                  : "text-gray-600 hover:bg-[#E6E9F0] hover:shadow-[4px_4px_8px_#c8ccd4,-4px_-4px_8px_#ffffff]"
+                  ? "bg-[var(--color-base-mint)] shadow-clay-pressed text-[var(--color-base-text)] font-bold"
+                  : "text-[var(--color-base-text)] opacity-80 hover:bg-[var(--color-base-mint)] hover:shadow-clay-btn hover:opacity-100"
               }`}
             >
               <Icon size={20} />
@@ -49,10 +52,9 @@ export default function Sidebar() {
       <div className="w-full px-6 mt-8">
         <button
           onClick={() => {
-            // Handle Logout
             window.location.href = "/login";
           }}
-          className="flex items-center space-x-3 w-full px-4 py-3 rounded-2xl text-red-500 font-medium transition-all duration-300 hover:bg-[#E6E9F0] hover:shadow-[4px_4px_8px_#c8ccd4,-4px_-4px_8px_#ffffff]"
+          className="flex items-center space-x-3 w-full px-4 py-3 rounded-2xl text-red-500/80 font-medium transition-all duration-300 hover:bg-[var(--color-base-mint)] hover:shadow-clay-btn hover:text-red-500"
         >
           <LogOut size={20} />
           <span>Logout</span>

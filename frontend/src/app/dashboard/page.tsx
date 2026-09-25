@@ -1,51 +1,163 @@
-export default function DashboardPage() {
+'use client';
+
+import { useState, useEffect } from 'react';
+import { FileText, BookOpen, Bell, TrendingUp, Clock, Upload, Eye, Lock } from 'lucide-react';
+import { useSession } from '@/context/session';
+
+const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+
+interface Resource {
+  id: number;
+  title: string;
+  visibility: string;
+  created_at: string;
+  owner_id: string;
+}
+
+function StatCard({ label, value, icon: Icon, accent }: {
+  label: string;
+  value: number | string;
+  icon: React.ElementType;
+  accent?: boolean;
+}) {
   return (
-    <div className="space-y-8">
+    <div className={`p-6 rounded-3xl shadow-clay-card flex flex-col gap-3 ${accent ? 'bg-[var(--color-base-yellow)]' : 'bg-[var(--color-base-mint)]'}`}>
+      <div className="flex items-center justify-between">
+        <p className="text-[var(--color-base-text)] opacity-70 text-xs font-bold uppercase tracking-widest">{label}</p>
+        <div className="p-2 rounded-xl bg-[var(--color-base-bg)] shadow-clay-btn">
+          <Icon size={16} className="text-[var(--color-base-text)]" />
+        </div>
+      </div>
+      <p className="text-5xl font-extrabold text-[var(--color-base-text)] tracking-tight">{value}</p>
+    </div>
+  );
+}
+
+function VisibilityBadge({ v }: { v: string }) {
+  const map: Record<string, { label: string; icon: React.ElementType; cls: string }> = {
+    PRIVATE: { label: 'Private', icon: Lock, cls: 'bg-[var(--color-base-yellow)]' },
+    DEPARTMENT_DISCOVERABLE: { label: 'Dept.', icon: Eye, cls: 'bg-[var(--color-base-mint)]' },
+    INSTITUTION_DISCOVERABLE: { label: 'Public', icon: Eye, cls: 'bg-[var(--color-base-bg)]' },
+  };
+  const cfg = map[v] || map.PRIVATE;
+  return (
+    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold shadow-clay-btn border border-white/20 text-[var(--color-base-text)] ${cfg.cls}`}>
+      <cfg.icon size={10} />
+      {cfg.label}
+    </span>
+  );
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
+export default function DashboardPage() {
+  const session = useSession();
+  const [resources, setResources] = useState<Resource[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch(`${API}/api/resources/`)
+      .then(r => r.ok ? r.json() : [])
+      .then(data => setResources(Array.isArray(data) ? data : []))
+      .catch(() => setResources([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const myResources = resources.filter(r => r.owner_id === session.id);
+  const recentActivity = [...resources]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 5);
+
+  return (
+    <div className="space-y-10">
       {/* Header */}
       <header>
-        <h1 className="text-4xl font-bold text-gray-800 tracking-tight">Overview</h1>
-        <p className="text-gray-500 mt-2">Welcome back to your professional dashboard.</p>
+        <p className="text-[var(--color-base-text)] opacity-50 text-xs font-bold uppercase tracking-widest mb-1">
+          {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+        </p>
+        <h1 className="text-4xl font-extrabold text-[var(--color-base-text)] tracking-tight">
+          Welcome back, <span className="opacity-60">{session.name}</span>
+        </h1>
+        <p className="text-[var(--color-base-text)] opacity-50 mt-1 font-medium text-sm">
+          {session.role} — Connect Plus
+        </p>
       </header>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        <div className="p-6 rounded-3xl bg-[#E6E9F0] shadow-[8px_8px_16px_#c8ccd4,-8px_-8px_16px_#ffffff] transition-all">
-          <h3 className="text-gray-500 text-sm font-medium">My Resources</h3>
-          <p className="text-3xl font-bold text-gray-800 mt-2">24</p>
+      {/* Stats */}
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[1,2,3].map(i => (
+            <div key={i} className="p-6 rounded-3xl bg-[var(--color-base-mint)] shadow-clay-card animate-pulse h-32" />
+          ))}
         </div>
-        
-        <div className="p-6 rounded-3xl bg-[#E6E9F0] shadow-[8px_8px_16px_#c8ccd4,-8px_-8px_16px_#ffffff] transition-all">
-          <h3 className="text-gray-500 text-sm font-medium">Teaching Kits</h3>
-          <p className="text-3xl font-bold text-gray-800 mt-2">5</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <StatCard label="My Resources" value={myResources.length} icon={FileText} />
+          <StatCard label="Total in Vault" value={resources.length} icon={BookOpen} accent />
+          <StatCard label="Access Requests" value={0} icon={Bell} />
         </div>
-        
-        <div className="p-6 rounded-3xl bg-[#E6E9F0] shadow-[8px_8px_16px_#c8ccd4,-8px_-8px_16px_#ffffff] transition-all">
-          <h3 className="text-gray-500 text-sm font-medium">Department Access Requests</h3>
-          <p className="text-3xl font-bold text-gray-800 mt-2">2</p>
-        </div>
-      </div>
+      )}
 
       {/* Recent Activity */}
-      <div className="mt-12 p-8 rounded-3xl bg-[#E6E9F0] shadow-[8px_8px_16px_#c8ccd4,-8px_-8px_16px_#ffffff]">
-        <h2 className="text-2xl font-bold text-gray-800 mb-6">Recent Activity</h2>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between p-4 rounded-2xl bg-[#E6E9F0] shadow-[inset_4px_4px_8px_#c8ccd4,inset_-4px_-4px_8px_#ffffff]">
-            <div>
-              <p className="text-gray-800 font-medium">Machine Learning Classification Notes</p>
-              <p className="text-gray-500 text-sm">Updated 2 hours ago</p>
+      <section className="p-8 rounded-3xl bg-[var(--color-base-mint)] shadow-clay-card">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-[var(--color-base-bg)] shadow-clay-btn">
+              <Clock size={16} className="text-[var(--color-base-text)]" />
             </div>
-            <span className="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-full">PUBLISHED</span>
+            <h2 className="text-xl font-bold text-[var(--color-base-text)]">Recent Activity</h2>
           </div>
-          
-          <div className="flex items-center justify-between p-4 rounded-2xl bg-[#E6E9F0] shadow-[inset_4px_4px_8px_#c8ccd4,inset_-4px_-4px_8px_#ffffff]">
-            <div>
-              <p className="text-gray-800 font-medium">Data Structures Lab Manual</p>
-              <p className="text-gray-500 text-sm">Added to Teaching Kit yesterday</p>
-            </div>
-            <span className="px-3 py-1 bg-green-100 text-green-700 text-xs font-semibold rounded-full">USE</span>
-          </div>
+          <a href="/dashboard/resources" className="text-xs font-bold text-[var(--color-base-text)] opacity-50 hover:opacity-100 transition-opacity">
+            View all →
+          </a>
         </div>
-      </div>
+
+        {loading ? (
+          <div className="space-y-3">
+            {[1,2,3].map(i => (
+              <div key={i} className="h-16 rounded-2xl bg-[var(--color-base-bg)] shadow-clay-pressed animate-pulse" />
+            ))}
+          </div>
+        ) : recentActivity.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-3 text-[var(--color-base-text)]">
+            <Upload size={36} className="opacity-20" />
+            <p className="font-bold opacity-50">No activity yet</p>
+            <p className="text-sm opacity-40 text-center max-w-xs">
+              Upload your first resource to get started. Your teaching materials will appear here.
+            </p>
+            <a href="/dashboard/resources" className="mt-2 px-5 py-2.5 rounded-xl bg-[var(--color-base-bg)] shadow-clay-btn text-sm font-bold text-[var(--color-base-text)] hover:shadow-clay-pressed transition-all">
+              Go to Resource Vault →
+            </a>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {recentActivity.map(r => (
+              <div key={r.id} className="flex items-center justify-between p-4 rounded-2xl bg-[var(--color-base-bg)] shadow-clay-pressed">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 rounded-lg bg-[var(--color-base-mint)] shadow-clay-btn flex-shrink-0">
+                    <FileText size={16} className="text-[var(--color-base-text)]" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[var(--color-base-text)] font-bold text-sm truncate">{r.title}</p>
+                    <p className="text-[var(--color-base-text)] opacity-50 text-xs font-medium flex items-center gap-1">
+                      <TrendingUp size={10} />
+                      {timeAgo(r.created_at)}
+                    </p>
+                  </div>
+                </div>
+                <VisibilityBadge v={r.visibility} />
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }

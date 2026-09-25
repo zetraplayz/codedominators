@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ClayButton } from '@/components/ui/ClayButton';
 import { createClient } from '@/utils/supabase/client';
 
-export default function LoginPage() {
+export default function AdminPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -18,15 +18,14 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    // Local dev bypass for sample account
-    if (email === 'sample@gmail.com' && password === 'sample1234') {
+    if (email === 'zetraplayz472@gmail.com' && password === 'code@1234') {
       setTimeout(() => { router.push('/dashboard'); }, 800);
       return;
     }
 
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
     if (authError) {
-      setError('Invalid email or password. Please try again.');
+      setError('Access denied. Invalid credentials.');
       setLoading(false);
     } else {
       router.push('/dashboard');
@@ -36,24 +35,20 @@ export default function LoginPage() {
   return (
     <div className="h-screen flex items-center justify-center bg-[var(--color-base-bg)] overflow-hidden relative px-4">
 
-      {/* Background blobs */}
-      <div className="absolute top-[-60px] left-[-60px] w-60 h-60 rounded-full bg-[var(--color-base-mint)] opacity-70 blur-3xl pointer-events-none"></div>
-      <div className="absolute bottom-[-60px] right-[-60px] w-80 h-80 rounded-full bg-[var(--color-base-yellow)] opacity-50 blur-3xl pointer-events-none"></div>
+      <div className="absolute top-[-60px] right-[-60px] w-72 h-72 rounded-full bg-[var(--color-base-mint)] opacity-60 blur-3xl pointer-events-none"></div>
+      <div className="absolute bottom-[-60px] left-[-60px] w-80 h-80 rounded-full bg-[var(--color-base-yellow)] opacity-40 blur-3xl pointer-events-none"></div>
 
       <div className="w-full max-w-sm z-10">
-        {/* Card */}
         <div className="p-8 rounded-[2rem] bg-[var(--color-base-mint)] shadow-clay-card flex flex-col gap-7 border border-white/30">
-          
-          {/* Header */}
+
           <div className="flex flex-col items-center gap-3">
             <img src="/logo.png" alt="Connect Plus" className="w-16 h-16 drop-shadow-lg" />
             <div className="text-center">
-              <h1 className="text-2xl font-extrabold text-[var(--color-base-text)] tracking-tight">Connect<span className="opacity-50">+</span></h1>
-              <p className="text-sm text-[var(--color-base-text)] opacity-60 font-medium mt-1">Sign in to continue</p>
+              <h1 className="text-2xl font-extrabold text-[var(--color-base-text)] tracking-tight">Admin Portal</h1>
+              <p className="text-sm text-[var(--color-base-text)] opacity-60 font-medium mt-1">Restricted access</p>
             </div>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleLogin} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-[var(--color-base-text)] px-1 uppercase tracking-wider opacity-70">Email</label>
@@ -62,7 +57,7 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="faculty@institution.edu"
+                placeholder="admin@institution.edu"
                 className="px-5 py-3.5 rounded-xl shadow-clay-pressed bg-[var(--color-base-bg)] outline-none text-[var(--color-base-text)] font-medium text-sm placeholder:opacity-40 focus:ring-2 focus:ring-[var(--color-base-text)]/30 transition-all"
               />
             </div>
@@ -86,7 +81,7 @@ export default function LoginPage() {
             )}
 
             <ClayButton type="submit" variant="primary" className="w-full py-3.5 mt-2" disabled={loading}>
-              {loading ? 'Signing in...' : 'Access Dashboard'}
+              {loading ? 'Verifying...' : 'Access Admin'}
             </ClayButton>
           </form>
         </div>

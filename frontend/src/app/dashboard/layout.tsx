@@ -1,4 +1,7 @@
+'use client';
 import Sidebar from "../../components/Sidebar";
+import { AiAssistant } from "@/components/AiAssistant";
+import { SessionProvider } from "@/context/session";
 
 export default function DashboardLayout({
   children,
@@ -6,11 +9,15 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-screen bg-[#E6E9F0]">
-      <Sidebar />
-      <main className="flex-1 p-10 overflow-y-auto">
-        {children}
-      </main>
-    </div>
+    <SessionProvider>
+      <div className="flex min-h-screen bg-[var(--color-base-bg)]">
+        <Sidebar />
+        <main className="flex-1 p-10 overflow-y-auto">
+          {children}
+        </main>
+        {/* MESH AI floating assistant — available on every dashboard page */}
+        <AiAssistant />
+      </div>
+    </SessionProvider>
   );
 }
