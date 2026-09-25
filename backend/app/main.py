@@ -14,7 +14,13 @@ app = FastAPI(
 # CORS configuration for Next.js frontend
 origins = [
     "http://localhost:3000",
+    "https://codedominators-five.vercel.app",
+    "https://codedominators-fxnjqm3do-zetra.vercel.app",
 ]
+
+@app.get("/")
+def read_root():
+    return {"status": "ok", "message": "Connect Plus API is running. Go to /docs for Swagger UI"}
 
 app.add_middleware(
     CORSMiddleware,
