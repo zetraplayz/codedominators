@@ -273,3 +273,109 @@ def create_resource_version(
     db.commit()
     db.refresh(db_version)
     return db_version
+
+
+@router.post("/{resource_id}/request-access")
+def request_access(
+    resource_id: int,
+    db: Session = Depends(get_db),
+    profile: models.User = Depends(get_current_profile)
+):
+    resource = db.query(models.Resource).filter(models.Resource.id == resource_id).first()
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource not found")
+    
+    if resource.owner_id == profile.id:
+        raise HTTPException(status_code=400, detail="You already own this resource")
+
+    # Check if blocked
+    is_blocked = db.query(models.UserBlock).filter(
+        models.UserBlock.blocker_id == resource.owner_id,
+        models.UserBlock.blocked_id == profile.id
+    ).first()
+    
+    if is_blocked:
+        raise HTTPException(status_code=403, detail="You are not permitted to request access from this user.")
+
+    # Create notification
+    notif = models.Notification(
+        user_id=resource.owner_id,
+        type="RESOURCE_ACCESS_REQUEST",
+        message=f"{profile.full_name} has requested edit access to your resource '{resource.title}'.",
+        metadata_obj={"requester_id": profile.id, "resource_id": resource.id}
+    )
+    db.add(notif)
+    db.commit()
+    
+    return {"detail": "Access request sent successfully."}
+
+
+@router.post("/{resource_id}/approve-access/{notification_id}")
+def approve_access(
+    resource_id: int,
+    notification_id: int,
+    db: Session = Depends(get_db),
+    profile: models.User = Depends(get_current_profile)
+):
+    # 1. Verify owner
+    resource = db.query(models.Resource).filter(models.Resource.id == resource_id).first()
+    if not resource or resource.owner_id != profile.id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    # 2. Verify notification
+    notif = db.query(models.Notification).filter(
+        models.Notification.id == notification_id,
+        models.Notification.user_id == profile.id
+    ).first()
+    
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    
+    requester_id = notif.metadata_obj.get("requester_id")
+    if not requester_id:
+        raise HTTPException(status_code=400, detail="Invalid notification metadata")
+
+    # 3. Mark read
+    notif.is_read = True
+
+    # 4. Fork the resource for the requester
+    new_resource = models.Resource(
+        title=resource.title,
+        description=resource.description,
+        visibility="PRIVATE",
+        owner_id=requester_id,
+        forked_from_id=resource.id
+    )
+    db.add(new_resource)
+    db.flush()
+
+    # 5. Copy the latest version
+    latest_version = db.query(models.ResourceVersion).filter(
+        models.ResourceVersion.resource_id == resource.id
+    ).order_by(models.ResourceVersion.version_number.desc()).first()
+
+    if latest_version:
+        new_version = models.ResourceVersion(
+            resource_id=new_resource.id,
+            version_number=1,
+            storage_path=latest_version.storage_path,
+            checksum=latest_version.checksum,
+            file_size=latest_version.file_size,
+            mime_type=latest_version.mime_type,
+            change_note="Forked from original",
+            created_by=requester_id,
+            status="PUBLISHED"
+        )
+        db.add(new_version)
+    
+    # 6. Notify requester
+    approval_notif = models.Notification(
+        user_id=requester_id,
+        type="RESOURCE_ACCESS_GRANTED",
+        message=f"{profile.full_name} has approved your access request. A copy of '{resource.title}' has been added to your resources.",
+        metadata_obj={"resource_id": new_resource.id, "original_id": resource.id}
+    )
+    db.add(approval_notif)
+
+    db.commit()
+    return {"detail": "Request approved. Resource forked for the requester."}
