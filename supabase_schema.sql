@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS profiles (
     department_id    INTEGER REFERENCES departments(id) ON DELETE SET NULL,
     designation      TEXT,
     job_profile      TEXT,
+    education        TEXT,
     specialization   TEXT,
     assigned_courses TEXT,
     mobile_number    TEXT,
@@ -63,8 +64,71 @@ CREATE TABLE IF NOT EXISTS resources (
     tags          TEXT[],
     category      TEXT,
     department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+    forked_from_id INTEGER REFERENCES resources(id) ON DELETE SET NULL,
     created_at    TIMESTAMPTZ DEFAULT NOW(),
     updated_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================
+-- TEACHING KITS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS teaching_kits (
+    id            SERIAL PRIMARY KEY,
+    owner_id      UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    name          TEXT NOT NULL,
+    subject       TEXT NOT NULL,
+    description   TEXT,
+    visibility    TEXT NOT NULL DEFAULT 'PRIVATE'
+                      CHECK (visibility IN ('PRIVATE','DEPARTMENT_DISCOVERABLE','INSTITUTION_DISCOVERABLE')),
+    department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+    created_at    TIMESTAMPTZ DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS teaching_kit_resources (
+    kit_id        INTEGER NOT NULL REFERENCES teaching_kits(id) ON DELETE CASCADE,
+    resource_id   INTEGER NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+    added_at      TIMESTAMPTZ DEFAULT NOW(),
+    PRIMARY KEY(kit_id, resource_id)
+);
+
+-- ============================================================
+-- NOTIFICATIONS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS notifications (
+    id                  SERIAL PRIMARY KEY,
+    user_id             UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    title               TEXT NOT NULL,
+    message             TEXT NOT NULL,
+    type                TEXT NOT NULL CHECK (type IN ('PERMISSION_REQUEST', 'PERMISSION_ACCEPTED', 'PERMISSION_DECLINED', 'SYSTEM')),
+    related_resource_id INTEGER REFERENCES resources(id) ON DELETE CASCADE,
+    requester_id        UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+    is_read             BOOLEAN DEFAULT FALSE,
+    created_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================
+-- USER BLOCKS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS user_blocks (
+    id          SERIAL PRIMARY KEY,
+    blocker_id  UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    blocked_id  UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    created_at  TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(blocker_id, blocked_id)
+);
+
+-- ============================================================
+-- RESOURCE REVIEWS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS resource_reviews (
+    id          SERIAL PRIMARY KEY,
+    resource_id INTEGER NOT NULL REFERENCES resources(id) ON DELETE CASCADE,
+    reviewer_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+    rating      INTEGER CHECK (rating >= 1 AND rating <= 5),
+    review_text TEXT,
+    created_at  TIMESTAMPTZ DEFAULT NOW(),
+    UNIQUE(resource_id, reviewer_id)
 );
 
 -- ============================================================
@@ -138,7 +202,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO profiles (id, full_name, official_email)
+    INSERT INTO public.profiles (id, full_name, official_email)
     VALUES (
         NEW.id,
         COALESCE(NEW.raw_user_meta_data->>'full_name', ''),
@@ -147,7 +211,7 @@ BEGIN
     ON CONFLICT (id) DO NOTHING;
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
@@ -177,6 +241,11 @@ ALTER TABLE resource_versions   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE resource_permissions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE access_requests     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE departments         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notifications       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_blocks         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE resource_reviews    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE teaching_kits       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE teaching_kit_resources ENABLE ROW LEVEL SECURITY;
 
 -- Drop old policies first (so re-runs don't error)
 DROP POLICY IF EXISTS "Users can read own profile"            ON profiles;
@@ -189,10 +258,22 @@ DROP POLICY IF EXISTS "Permissions visible to owner and grantee" ON resource_per
 DROP POLICY IF EXISTS "Access request visibility"             ON access_requests;
 DROP POLICY IF EXISTS "Authenticated can create access requests" ON access_requests;
 DROP POLICY IF EXISTS "Authenticated can view departments"    ON departments;
+DROP POLICY IF EXISTS "Users can read their own notifications" ON notifications;
+DROP POLICY IF EXISTS "Users can update their own notifications" ON notifications;
+DROP POLICY IF EXISTS "Users can read their own blocks"       ON user_blocks;
+DROP POLICY IF EXISTS "Users can create blocks"               ON user_blocks;
+DROP POLICY IF EXISTS "Users can delete blocks"               ON user_blocks;
+DROP POLICY IF EXISTS "HODs can create reviews"               ON resource_reviews;
+DROP POLICY IF EXISTS "Anyone can view reviews"               ON resource_reviews;
+DROP POLICY IF EXISTS "Users can view all profiles"           ON profiles;
+DROP POLICY IF EXISTS "Users can view discoverable kits"      ON teaching_kits;
+DROP POLICY IF EXISTS "Owners full access kits"               ON teaching_kits;
+DROP POLICY IF EXISTS "Anyone can view kit resources"         ON teaching_kit_resources;
+DROP POLICY IF EXISTS "Owners can add kit resources"          ON teaching_kit_resources;
 
 -- Profiles
-CREATE POLICY "Users can read own profile"
-    ON profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "Users can view all profiles"
+    ON profiles FOR SELECT USING (auth.uid() IS NOT NULL);
 CREATE POLICY "Users can update own profile"
     ON profiles FOR UPDATE USING (auth.uid() = id);
 
@@ -211,6 +292,30 @@ CREATE POLICY "Permitted users can view"
             WHERE resource_permissions.resource_id = resources.id
               AND resource_permissions.user_id = auth.uid()
         )
+    );
+
+-- Notifications
+CREATE POLICY "Users can read their own notifications"
+    ON notifications FOR SELECT USING (auth.uid() = user_id);
+CREATE POLICY "Users can update their own notifications"
+    ON notifications FOR UPDATE USING (auth.uid() = user_id);
+CREATE POLICY "System can insert notifications"
+    ON notifications FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+
+-- User Blocks
+CREATE POLICY "Users can read their own blocks"
+    ON user_blocks FOR SELECT USING (auth.uid() = blocker_id OR auth.uid() = blocked_id);
+CREATE POLICY "Users can create blocks"
+    ON user_blocks FOR INSERT WITH CHECK (auth.uid() = blocker_id);
+CREATE POLICY "Users can delete blocks"
+    ON user_blocks FOR DELETE USING (auth.uid() = blocker_id);
+
+-- Resource Reviews
+CREATE POLICY "Anyone can view reviews"
+    ON resource_reviews FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "HODs can create reviews"
+    ON resource_reviews FOR INSERT WITH CHECK (
+        EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'HOD')
     );
 
 -- Versions
@@ -244,6 +349,23 @@ CREATE POLICY "Authenticated can create access requests"
 -- Departments
 CREATE POLICY "Authenticated can view departments"
     ON departments FOR SELECT USING (auth.uid() IS NOT NULL);
+
+-- Teaching Kits
+CREATE POLICY "Owners full access kits"
+    ON teaching_kits FOR ALL USING (auth.uid() = owner_id);
+CREATE POLICY "Users can view discoverable kits"
+    ON teaching_kits FOR SELECT USING (
+        auth.uid() IS NOT NULL AND
+        visibility IN ('DEPARTMENT_DISCOVERABLE','INSTITUTION_DISCOVERABLE')
+    );
+
+-- Teaching Kit Resources
+CREATE POLICY "Anyone can view kit resources"
+    ON teaching_kit_resources FOR SELECT USING (auth.uid() IS NOT NULL);
+CREATE POLICY "Owners can add kit resources"
+    ON teaching_kit_resources FOR ALL USING (
+        EXISTS (SELECT 1 FROM teaching_kits WHERE id = kit_id AND owner_id = auth.uid())
+    );
 
 -- ============================================================
 -- STORAGE BUCKET
