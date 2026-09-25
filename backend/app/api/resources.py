@@ -19,7 +19,13 @@ STORAGE_BUCKET = "resources"
 
 # Local uploads fallback dir (used if Supabase storage fails)
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+if os.getenv("VERCEL") == "1":
+    UPLOAD_DIR = "/tmp/uploads"
+
+try:
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+except OSError:
+    pass
 
 
 def get_supabase() -> Client:
