@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from app.api import resources
 
 app = FastAPI(
     title="Connect Plus API",
@@ -19,6 +20,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(resources.router, prefix="/api/resources", tags=["Resources"])
 
 @app.get("/health")
 def health_check():
