@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { BookOpen, Plus, Layers, FileText, Lock, Eye, ChevronRight } from 'lucide-react';
+import { BookOpen, Plus, Layers, FileText, Lock, Eye, ChevronRight, X } from 'lucide-react';
 import { ClayButton } from '@/components/ui/ClayButton';
 
 interface KitItem {
@@ -26,10 +26,29 @@ function VisibilityBadge({ v }: { v: string }) {
 }
 
 export default function TeachingKitsPage() {
-  const [kits] = useState<KitItem[]>(EMPTY);
+  const [kits, setKits] = useState<KitItem[]>(EMPTY);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [newKitName, setNewKitName] = useState('');
+  const [newKitSubject, setNewKitSubject] = useState('');
+
+  const handleCreateKit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newKit: KitItem = {
+      id: Date.now(),
+      name: newKitName,
+      subject: newKitSubject,
+      resourceCount: 0,
+      visibility: 'PRIVATE',
+      lastUpdated: new Date().toISOString()
+    };
+    setKits([newKit, ...kits]);
+    setNewKitName('');
+    setNewKitSubject('');
+    setIsModalOpen(false);
+  };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
       {/* Header */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -38,7 +57,7 @@ export default function TeachingKitsPage() {
             Curated bundles of resources organised by subject or course.
           </p>
         </div>
-        <ClayButton variant="primary" className="flex items-center gap-2">
+        <ClayButton onClick={() => setIsModalOpen(true)} variant="primary" className="flex items-center gap-2">
           <Plus size={18} /> New Teaching Kit
         </ClayButton>
       </header>
@@ -66,7 +85,7 @@ export default function TeachingKitsPage() {
               Create your first kit to bundle related resources into a structured package for your department.
             </p>
           </div>
-          <ClayButton variant="primary" className="flex items-center gap-2 mt-2">
+          <ClayButton onClick={() => setIsModalOpen(true)} variant="primary" className="flex items-center gap-2 mt-2">
             <Plus size={16} /> Create First Kit
           </ClayButton>
         </div>
@@ -96,6 +115,54 @@ export default function TeachingKitsPage() {
           ))}
         </div>
       )}
+
+      {/* Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-lg p-8 rounded-[2rem] bg-[var(--color-base-bg)] shadow-clay-card flex flex-col relative border border-white/40">
+            <button 
+              onClick={() => setIsModalOpen(false)}
+              className="absolute top-6 right-6 p-2 rounded-full bg-[var(--color-base-mint)] shadow-clay-btn text-[var(--color-base-text)] hover:shadow-clay-pressed transition-all"
+            >
+              <X size={20} />
+            </button>
+            <div className="mb-8">
+              <h2 className="text-2xl font-bold text-[var(--color-base-text)]">Create Teaching Kit</h2>
+              <p className="opacity-70 text-[var(--color-base-text)] font-medium mt-1">Organize resources into a single bundle.</p>
+            </div>
+            <form onSubmit={handleCreateKit} className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <label className="font-bold text-sm text-[var(--color-base-text)]">Kit Name</label>
+                <input 
+                  type="text" 
+                  required
+                  value={newKitName}
+                  onChange={(e) => setNewKitName(e.target.value)}
+                  className="p-4 rounded-2xl border-none outline-none shadow-clay-pressed bg-[var(--color-base-mint)] focus:ring-2 focus:ring-[var(--color-base-text)] text-[var(--color-base-text)] font-medium"
+                  placeholder="e.g. Database Systems 2026"
+                />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="font-bold text-sm text-[var(--color-base-text)]">Subject / Course</label>
+                <input 
+                  type="text" 
+                  required
+                  value={newKitSubject}
+                  onChange={(e) => setNewKitSubject(e.target.value)}
+                  className="p-4 rounded-2xl border-none outline-none shadow-clay-pressed bg-[var(--color-base-mint)] focus:ring-2 focus:ring-[var(--color-base-text)] text-[var(--color-base-text)] font-medium"
+                  placeholder="e.g. CS-301"
+                />
+              </div>
+              <div className="flex justify-end mt-2">
+                <ClayButton type="submit" variant="primary" className="w-full">
+                  Create Kit
+                </ClayButton>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
