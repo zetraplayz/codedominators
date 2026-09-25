@@ -16,6 +16,7 @@ origins = [
     "http://localhost:3000",
     "https://codedominators-five.vercel.app",
     "https://codedominators-fxnjqm3do-zetra.vercel.app",
+    "https://codedominators-xkdg.vercel.app",
 ]
 
 @app.get("/")
