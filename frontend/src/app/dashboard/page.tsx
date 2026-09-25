@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { FileText, BookOpen, Bell, TrendingUp, Clock, Upload, Eye, Lock } from 'lucide-react';
 import { useSession } from '@/context/session';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://codedominators-five.vercel.app';
 
 interface Resource {
   id: number;

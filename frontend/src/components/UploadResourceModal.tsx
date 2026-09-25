@@ -11,7 +11,7 @@ interface UploadResourceModalProps {
   userId?: string;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://codedominators-five.vercel.app';
 
 export function UploadResourceModal({ isOpen, onClose, onUploadSuccess, userId = 'sample_faculty_id' }: UploadResourceModalProps) {
   const [title, setTitle]           = useState('');

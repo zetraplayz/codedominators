@@ -6,7 +6,7 @@ import { ClayButton } from '@/components/ui/ClayButton';
 import { UploadResourceModal } from '@/components/UploadResourceModal';
 import { useSession } from '@/context/session';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://codedominators-five.vercel.app';
 
 interface Resource {
   id: number;

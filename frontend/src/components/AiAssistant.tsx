@@ -8,7 +8,7 @@ interface Message {
   content: string;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API = process.env.NEXT_PUBLIC_API_URL || 'https://codedominators-five.vercel.app';
 
 export function AiAssistant({ resourceContext }: { resourceContext?: string }) {
   const [open, setOpen] = useState(false);
