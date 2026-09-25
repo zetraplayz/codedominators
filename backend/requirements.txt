@@ -9,5 +9,5 @@ python-multipart
 google-genai
 openai
 PyJWT
-python-magic-bin
+
 psycopg2-binary>=2.9.0
