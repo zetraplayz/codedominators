@@ -12,6 +12,7 @@ load_dotenv()
 import itertools
 import logging
 from typing import List, Optional
+from fastapi.concurrency import run_in_threadpool
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
@@ -172,7 +173,7 @@ async def ask_ai(req: AskRequest):
         history_block += f"{prefix}: {m.content}\n"
 
     prompt = f"{_SYSTEM}{context_block}\n\n{history_block}User: {req.question}\nMESH:"
-    text, provider = _generate(prompt)
+    text, provider = await run_in_threadpool(_generate, prompt)
     return AskResponse(answer=text.strip(), provider=provider)
 
 
@@ -198,7 +199,7 @@ RANKED:
 - Title 2
 EXPLANATION: <one line reason for top result>"""
 
-    text, provider = _generate(prompt)
+    text, provider = await run_in_threadpool(_generate, prompt)
     ranked, explanation, in_ranked = [], "", False
     for line in text.strip().split("\n"):
         line = line.strip()
@@ -232,7 +233,7 @@ SUMMARY: <summary>
 TAGS: <tag1>, <tag2>, <tag3>
 CATEGORY: <category>"""
 
-    text, provider = _generate(prompt)
+    text, provider = await run_in_threadpool(_generate, prompt)
     summary, tags, category = "", [], "Other"
     for line in text.strip().split("\n"):
         line = line.strip()

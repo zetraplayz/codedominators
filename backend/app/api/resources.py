@@ -115,39 +115,59 @@ async def create_resource(
         db.commit()
 
     # 3. THEN the DB transaction
-    db_resource = models.Resource(
-        title=title,
-        description=description,
-        visibility=visibility,
-        owner_id=profile.id
-    )
-    db.add(db_resource)
-    db.commit()
-    db.refresh(db_resource)
+    try:
+        db_resource = models.Resource(
+            title=title,
+            description=description,
+            visibility=visibility,
+            owner_id=profile.id
+        )
+        db.add(db_resource)
+        db.flush() # Flush to get db_resource.id without committing
 
-    db_version = models.ResourceVersion(
-        resource_id=db_resource.id,
-        version_number=1,
-        storage_path=storage_path,
-        file_size=file_size,
-        mime_type=file.content_type,
-        checksum=checksum,
-        status="PUBLISHED",
-        created_by=profile.id
-    )
-    db.add(db_version)
-    db.commit()
-    db.refresh(db_resource)
-    return db_resource
+        db_version = models.ResourceVersion(
+            resource_id=db_resource.id,
+            version_number=1,
+            storage_path=storage_path,
+            file_size=file_size,
+            mime_type=file.content_type,
+            checksum=checksum,
+            status="PUBLISHED",
+            created_by=profile.id
+        )
+        db.add(db_version)
+        db.commit()
+        db.refresh(db_resource)
+        return db_resource
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Database transaction failed: {str(e)}")
 
+
+from sqlalchemy.orm import selectinload
 
 @router.get("/", response_model=List[resource_schema.Resource])
 def list_resources(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    profile: models.User = Depends(get_current_profile)
 ):
-    resources = db.query(models.Resource).offset(skip).limit(limit).all()
+    from sqlalchemy import or_
+    
+    resources = (
+        db.query(models.Resource)
+        .options(selectinload(models.Resource.versions))
+        .filter(
+            or_(
+                models.Resource.owner_id == profile.id,
+                models.Resource.visibility != "PRIVATE"
+            )
+        )
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
     return resources
 
 
@@ -155,17 +175,29 @@ from fastapi.responses import FileResponse, StreamingResponse
 import io
 
 @router.get("/{resource_id}", response_model=resource_schema.Resource)
-def get_resource(resource_id: int, db: Session = Depends(get_db)):
+def get_resource(
+    resource_id: int, 
+    db: Session = Depends(get_db),
+    profile: models.User = Depends(get_current_profile)
+):
     resource = db.query(models.Resource).filter(models.Resource.id == resource_id).first()
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
+    if resource.owner_id != profile.id and resource.visibility == "PRIVATE":
+        raise HTTPException(status_code=403, detail="Forbidden")
     return resource
 
 @router.get("/{resource_id}/download")
-def download_resource(resource_id: int, db: Session = Depends(get_db)):
-    resource = db.query(models.Resource).filter(models.Resource.id == resource_id).first()
+def download_resource(
+    resource_id: int, 
+    db: Session = Depends(get_db),
+    profile: models.User = Depends(get_current_profile)
+):
+    resource = db.query(models.Resource).options(selectinload(models.Resource.versions)).filter(models.Resource.id == resource_id).first()
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
+    if resource.owner_id != profile.id and resource.visibility == "PRIVATE":
+        raise HTTPException(status_code=403, detail="Forbidden")
     
     latest_version = None
     if resource.versions:

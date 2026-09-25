@@ -46,7 +46,11 @@ export default function ResourcesPage() {
     setDisplayedIds(null);
     setAiExplanation('');
     try {
-      const r = await fetch(`${API}/api/resources/`);
+      const r = await fetch(`${API}/api/resources/`, {
+        headers: {
+          'Authorization': 'Bearer DEV_TOKEN'
+        }
+      });
       if (r.ok) setResources(await r.json());
     } catch { /* backend offline */ }
     finally { setLoading(false); }
@@ -64,7 +68,10 @@ export default function ResourcesPage() {
     try {
       const res = await fetch(`${API}/api/ai/search`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer DEV_TOKEN'
+        },
         body: JSON.stringify({ query: q, resource_titles: resources.map(r => r.title) }),
       });
       if (res.ok) {
@@ -85,8 +92,35 @@ export default function ResourcesPage() {
     }
   };
 
-  const handleDownload = (id: number) => {
-    window.open(`${API}/api/resources/${id}/download`, '_blank');
+  const handleDownload = async (id: number) => {
+    try {
+      const res = await fetch(`${API}/api/resources/${id}/download`, {
+        headers: {
+          'Authorization': 'Bearer DEV_TOKEN'
+        }
+      });
+      if (!res.ok) {
+        alert('Failed to download resource or access denied.');
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      // We extract filename from content-disposition if possible, but fallback to a default
+      const contentDisposition = res.headers.get('Content-Disposition');
+      let filename = `resource-${id}`;
+      if (contentDisposition && contentDisposition.includes('filename="')) {
+        filename = contentDisposition.split('filename="')[1].split('"')[0];
+      }
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch {
+      alert('Network error while downloading.');
+    }
   };
 
   const handleDelete = async (id: number) => {
