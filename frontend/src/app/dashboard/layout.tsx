@@ -10,10 +10,12 @@ export default function DashboardLayout({
 }) {
   return (
     <SessionProvider>
-      <div className="flex min-h-screen bg-[var(--color-base-bg)]">
+      <div className="flex h-screen overflow-hidden bg-[var(--color-base-bg)]">
         <Sidebar />
-        <main className="flex-1 p-10 overflow-y-auto">
-          {children}
+        <main className="flex-1 overflow-y-auto">
+          <div className="max-w-7xl mx-auto p-4 md:p-10">
+            {children}
+          </div>
         </main>
         {/* MESH AI floating assistant — available on every dashboard page */}
         <AiAssistant />

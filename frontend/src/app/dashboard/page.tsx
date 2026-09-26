@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { FileText, BookOpen, Bell, TrendingUp, Clock, Upload, Eye, Lock } from 'lucide-react';
+import { FileText, BookOpen, Bell, TrendingUp, Clock, Upload, Eye, Lock, Search } from 'lucide-react';
 import { useSession } from '@/context/session';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'https://codedominators-five.vercel.app';
@@ -14,14 +14,15 @@ interface Resource {
   owner_id: string;
 }
 
-function StatCard({ label, value, icon: Icon, accent }: {
+function StatCard({ label, value, icon: Icon, accent, href }: {
   label: string;
   value: number | string;
   icon: React.ElementType;
   accent?: boolean;
+  href?: string;
 }) {
-  return (
-    <div className={`p-6 rounded-3xl shadow-clay-card flex flex-col gap-3 ${accent ? 'bg-[var(--color-base-yellow)]' : 'bg-[var(--color-base-mint)]'}`}>
+  const content = (
+    <>
       <div className="flex items-center justify-between">
         <p className="text-[var(--color-base-text)] opacity-70 text-xs font-bold uppercase tracking-widest">{label}</p>
         <div className="p-2 rounded-xl bg-[var(--color-base-bg)] shadow-clay-btn">
@@ -29,6 +30,22 @@ function StatCard({ label, value, icon: Icon, accent }: {
         </div>
       </div>
       <p className="text-5xl font-extrabold text-[var(--color-base-text)] tracking-tight">{value}</p>
+    </>
+  );
+
+  const className = `p-6 rounded-3xl shadow-clay-card flex flex-col gap-3 transition-all ${accent ? 'bg-[var(--color-base-yellow)]' : 'bg-[var(--color-base-mint)]'} ${href ? 'hover:shadow-clay-pressed cursor-pointer' : ''}`;
+
+  if (href) {
+    return (
+      <a href={href} className={className} style={{ display: 'flex', textDecoration: 'none' }}>
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <div className={className}>
+      {content}
     </div>
   );
 }
@@ -61,11 +78,17 @@ export default function DashboardPage() {
   const { user: session, loading: sessionLoading } = useSession();
   const [resources, setResources] = useState<Resource[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
+  const [accessRequests, setAccessRequests] = useState(0);
 
   useEffect(() => {
-    fetch(`/api/resources/`)
-      .then(r => r.ok ? r.json() : [])
-      .then(data => setResources(Array.isArray(data) ? data : []))
+    Promise.all([
+      fetch(`/api/resources/`, { credentials: 'include', cache: 'no-store' }).then(r => r.ok ? r.json() : []),
+      fetch(`/api/auth/notifications`, { credentials: 'include', cache: 'no-store' }).then(r => r.ok ? r.json() : { access_request_count: 0 })
+    ])
+      .then(([resourcesData, notifData]) => {
+        setResources(Array.isArray(resourcesData) ? resourcesData : []);
+        setAccessRequests(notifData.access_request_count || 0);
+      })
       .catch(() => setResources([]))
       .finally(() => setDataLoading(false));
   }, []);
@@ -89,24 +112,45 @@ export default function DashboardPage() {
           Welcome back, <span className="opacity-60">{session.name}</span>
         </h1>
         <p className="text-[var(--color-base-text)] opacity-50 mt-1 font-medium text-sm">
-          {session.role} — Connect Plus
+          {session.role} - Connect Plus
         </p>
       </header>
 
       {/* Stats */}
       {dataLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {[1,2,3].map(i => (
+          {[1, 2, 3].map(i => (
             <div key={i} className="p-6 rounded-3xl bg-[var(--color-base-mint)] shadow-clay-card animate-pulse h-32" />
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatCard label="My Resources" value={myResources.length} icon={FileText} />
-          <StatCard label="Total in Vault" value={resources.length} icon={BookOpen} accent />
-          <StatCard label="Access Requests" value={0} icon={Bell} />
+          <StatCard label="My Resources" value={myResources.length} icon={FileText} href="/dashboard/resources" />
+          <StatCard label="Total in Vault" value={resources.length} icon={BookOpen} accent href="/dashboard/resources" />
+          <StatCard label="Access Requests" value={accessRequests} icon={Bell} href="/dashboard/notifications" />
         </div>
       )}
+
+      {/* Quick Actions */}
+      <section className="flex flex-wrap gap-4">
+        <a href="/dashboard/notifications" className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-[var(--color-base-yellow)] shadow-clay-card hover:shadow-clay-pressed transition-all text-[var(--color-base-text)] font-bold">
+          <Bell size={20} />
+          Access Requests
+          {accessRequests > 0 && <span className="ml-2 bg-[var(--color-base-bg)] text-xs px-2 py-0.5 rounded-full shadow-clay-btn">{accessRequests}</span>}
+        </a>
+        <a href="/dashboard/resources" className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-[var(--color-base-mint)] shadow-clay-card hover:shadow-clay-pressed transition-all text-[var(--color-base-text)] font-bold">
+          <BookOpen size={20} />
+          Resource Vault
+        </a>
+        <a href="/dashboard/kits" className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-[var(--color-base-bg)] shadow-clay-card hover:shadow-clay-pressed transition-all text-[var(--color-base-text)] font-bold border border-white/20">
+          <FileText size={20} />
+          Teaching Kits
+        </a>
+        <a href="/dashboard/resources" className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-[var(--color-base-mint)] shadow-clay-card hover:shadow-clay-pressed transition-all text-[var(--color-base-text)] font-bold">
+          <Search size={20} />
+          AI Search
+        </a>
+      </section>
 
       {/* Recent Activity */}
       <section className="p-8 rounded-3xl bg-[var(--color-base-mint)] shadow-clay-card">
@@ -124,7 +168,7 @@ export default function DashboardPage() {
 
         {dataLoading ? (
           <div className="space-y-3">
-            {[1,2,3].map(i => (
+            {[1, 2, 3].map(i => (
               <div key={i} className="h-16 rounded-2xl bg-[var(--color-base-bg)] shadow-clay-pressed animate-pulse" />
             ))}
           </div>

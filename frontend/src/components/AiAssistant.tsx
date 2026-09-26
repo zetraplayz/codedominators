@@ -8,7 +8,6 @@ interface Message {
   content: string;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://codedominators-five.vercel.app';
 
 export function AiAssistant({ resourceContext }: { resourceContext?: string }) {
   const [open, setOpen] = useState(false);
@@ -35,8 +34,9 @@ export function AiAssistant({ resourceContext }: { resourceContext?: string }) {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API}/api/ai/ask`, {
+      const res = await fetch(`/api/ai/ask`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           question: q,

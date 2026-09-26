@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { BookOpen, Plus, Layers, FileText, Lock, Eye, ChevronRight, X } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { BookOpen, Plus, Layers, FileText, Lock, Eye, ChevronRight, X, Loader2 } from 'lucide-react';
 import { ClayButton } from '@/components/ui/ClayButton';
+import { useRouter } from 'next/navigation';
 
 interface KitItem {
   id: number;
@@ -12,9 +13,6 @@ interface KitItem {
   visibility: string;
   lastUpdated: string;
 }
-
-// Empty state — kits will be loaded from backend once Teaching Kits backend is built
-const EMPTY: KitItem[] = [];
 
 function VisibilityBadge({ v }: { v: string }) {
   return (
@@ -26,25 +24,46 @@ function VisibilityBadge({ v }: { v: string }) {
 }
 
 export default function TeachingKitsPage() {
-  const [kits, setKits] = useState<KitItem[]>(EMPTY);
+  const [kits, setKits] = useState<KitItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newKitName, setNewKitName] = useState('');
   const [newKitSubject, setNewKitSubject] = useState('');
+  const [creating, setCreating] = useState(false);
 
-  const handleCreateKit = (e: React.FormEvent) => {
+  useEffect(() => {
+    fetch('/api/kits', { credentials: 'include' })
+      .then(res => res.ok ? res.json() : [])
+      .then(data => setKits(Array.isArray(data) ? data : []))
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleCreateKit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newKit: KitItem = {
-      id: Date.now(),
-      name: newKitName,
-      subject: newKitSubject,
-      resourceCount: 0,
-      visibility: 'PRIVATE',
-      lastUpdated: new Date().toISOString()
-    };
-    setKits([newKit, ...kits]);
-    setNewKitName('');
-    setNewKitSubject('');
-    setIsModalOpen(false);
+    setCreating(true);
+    try {
+      const res = await fetch('/api/kits', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newKitName, subject: newKitSubject })
+      });
+      if (res.ok) {
+        const newKit = await res.json();
+        setKits(prev => [newKit, ...prev]);
+        setNewKitName('');
+        setNewKitSubject('');
+        setIsModalOpen(false);
+      } else {
+        alert('Failed to create teaching kit');
+      }
+    } catch {
+      alert('Network error');
+    } finally {
+      setCreating(false);
+    }
   };
 
   return (
@@ -74,7 +93,13 @@ export default function TeachingKitsPage() {
       </div>
 
       {/* Kit List */}
-      {kits.length === 0 ? (
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[1, 2, 3, 4].map(i => (
+            <div key={i} className="h-48 rounded-3xl bg-[var(--color-base-mint)] shadow-clay-card animate-pulse" />
+          ))}
+        </div>
+      ) : kits.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 gap-5 text-[var(--color-base-text)]">
           <div className="p-6 rounded-3xl bg-[var(--color-base-mint)] shadow-clay-card">
             <BookOpen size={48} className="opacity-20" />
@@ -92,7 +117,7 @@ export default function TeachingKitsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {kits.map(kit => (
-            <div key={kit.id} className="group p-6 rounded-3xl bg-[var(--color-base-mint)] shadow-clay-card hover:shadow-clay-pressed transition-all cursor-pointer">
+            <div key={kit.id} onClick={() => router.push(`/dashboard/kits/${kit.id}`)} className="group p-6 rounded-3xl bg-[var(--color-base-mint)] shadow-clay-card hover:shadow-clay-pressed transition-all cursor-pointer">
               <div className="flex items-start justify-between mb-4">
                 <div className="p-3 rounded-2xl bg-[var(--color-base-bg)] shadow-clay-btn">
                   <BookOpen size={22} className="text-[var(--color-base-text)]" />
@@ -116,11 +141,11 @@ export default function TeachingKitsPage() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Create Kit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="w-full max-w-lg p-8 rounded-[2rem] bg-[var(--color-base-bg)] shadow-clay-card flex flex-col relative border border-white/40">
-            <button 
+            <button
               onClick={() => setIsModalOpen(false)}
               className="absolute top-6 right-6 p-2 rounded-full bg-[var(--color-base-mint)] shadow-clay-btn text-[var(--color-base-text)] hover:shadow-clay-pressed transition-all"
             >
@@ -133,8 +158,8 @@ export default function TeachingKitsPage() {
             <form onSubmit={handleCreateKit} className="flex flex-col gap-5">
               <div className="flex flex-col gap-2">
                 <label className="font-bold text-sm text-[var(--color-base-text)]">Kit Name</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
                   value={newKitName}
                   onChange={(e) => setNewKitName(e.target.value)}
@@ -144,8 +169,8 @@ export default function TeachingKitsPage() {
               </div>
               <div className="flex flex-col gap-2">
                 <label className="font-bold text-sm text-[var(--color-base-text)]">Subject / Course</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   required
                   value={newKitSubject}
                   onChange={(e) => setNewKitSubject(e.target.value)}
@@ -154,8 +179,9 @@ export default function TeachingKitsPage() {
                 />
               </div>
               <div className="flex justify-end mt-2">
-                <ClayButton type="submit" variant="primary" className="w-full">
-                  Create Kit
+                <ClayButton type="submit" variant="primary" className="w-full flex items-center justify-center gap-2" disabled={creating}>
+                  {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                  {creating ? 'Creating...' : 'Create Kit'}
                 </ClayButton>
               </div>
             </form>

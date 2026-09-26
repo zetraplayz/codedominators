@@ -4,7 +4,7 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import resources, ai, auth
+from app.api import resources, ai, auth, kits, departments, admin
 from app.core.database import engine, Base
 
 # Create tables locally in SQLite
@@ -39,6 +39,9 @@ app.add_middleware(
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(resources.router, prefix="/api/resources", tags=["Resources"])
+app.include_router(kits.router, prefix="/api/kits", tags=["Kits"])
+app.include_router(departments.router, prefix="/api/departments", tags=["Departments"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(ai.router, prefix="/api/ai", tags=["AI"])
 
 @app.get("/health")

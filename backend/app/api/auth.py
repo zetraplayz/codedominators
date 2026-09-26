@@ -1,7 +1,7 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.orm import Session
-from passlib.context import CryptContext
+from passlib.context import CryptContext  # type: ignore
 from pydantic import BaseModel, EmailStr
 from app.core.database import get_db
 from app import models
@@ -83,27 +83,59 @@ def get_me(profile: models.User = Depends(get_current_profile)):
         "id": profile.id,
         "email": profile.official_email,
         "name": profile.full_name,
+        "employee_id": profile.employee_id,
         "role": profile.role,
-        "department": profile.department,
-        "education": profile.education
+        "department": profile.department.name if profile.department else None,
+        "education": profile.education,
+        "designation": profile.designation,
+        "job_profile": profile.job_profile,
+        "specialization": profile.specialization,
+        "assigned_courses": profile.assigned_courses,
+        "mobile_number": profile.mobile_number,
+        "short_bio": profile.short_bio,
+        "profile_photo": profile.profile_photo,
     }
 
 class UserUpdate(BaseModel):
+    full_name: Optional[str] = None
     department: Optional[str] = None
     education: Optional[str] = None
-    role: Optional[str] = None
+    designation: Optional[str] = None
+    job_profile: Optional[str] = None
+    specialization: Optional[str] = None
+    assigned_courses: Optional[str] = None
+    mobile_number: Optional[str] = None
+    short_bio: Optional[str] = None
     profile_photo: Optional[str] = None
 
 @router.put("/me")
 def update_me(update_data: UserUpdate, profile: models.User = Depends(get_current_profile), db: Session = Depends(get_db)):
+    if update_data.full_name is not None:
+        profile.full_name = update_data.full_name  # type: ignore
     if update_data.department is not None:
-        profile.department = update_data.department
+        dept = db.query(models.Department).filter(models.Department.name == update_data.department).first()
+        if not dept:
+            dept = models.Department(name=update_data.department)
+            db.add(dept)
+            db.commit()
+            db.refresh(dept)
+        profile.department_id = dept.id  # type: ignore
     if update_data.education is not None:
-        profile.education = update_data.education
-    if update_data.role is not None:
-        profile.role = update_data.role
+        profile.education = update_data.education  # type: ignore
+    if update_data.designation is not None:
+        profile.designation = update_data.designation  # type: ignore
+    if update_data.job_profile is not None:
+        profile.job_profile = update_data.job_profile  # type: ignore
+    if update_data.specialization is not None:
+        profile.specialization = update_data.specialization  # type: ignore
+    if update_data.assigned_courses is not None:
+        profile.assigned_courses = update_data.assigned_courses  # type: ignore
+    if update_data.mobile_number is not None:
+        profile.mobile_number = update_data.mobile_number  # type: ignore
+    if update_data.short_bio is not None:
+        profile.short_bio = update_data.short_bio  # type: ignore
     if update_data.profile_photo is not None:
-        profile.profile_photo = update_data.profile_photo
+        profile.profile_photo = update_data.profile_photo  # type: ignore
     
     db.commit()
     db.refresh(profile)
@@ -112,8 +144,59 @@ def update_me(update_data: UserUpdate, profile: models.User = Depends(get_curren
         "id": profile.id,
         "email": profile.official_email,
         "name": profile.full_name,
+        "employee_id": profile.employee_id,
         "role": profile.role,
-        "department": profile.department,
+        "department": profile.department.name if profile.department else None,
         "education": profile.education,
-        "profile_photo": profile.profile_photo
+        "designation": profile.designation,
+        "job_profile": profile.job_profile,
+        "specialization": profile.specialization,
+        "assigned_courses": profile.assigned_courses,
+        "mobile_number": profile.mobile_number,
+        "short_bio": profile.short_bio,
+        "profile_photo": profile.profile_photo,
     }
+
+
+@router.get("/notifications")
+def get_notifications(profile: models.User = Depends(get_current_profile), db: Session = Depends(get_db)):
+    """Get unread notifications + access request count for the current user."""
+    notifs = db.query(models.Notification).filter(
+        models.Notification.user_id == profile.id
+    ).order_by(models.Notification.created_at.desc()).limit(20).all()
+    
+    # Count pending access requests (notifications sent TO this user asking for access)
+    access_requests = db.query(models.Notification).filter(
+        models.Notification.user_id == profile.id,
+        models.Notification.type == "RESOURCE_ACCESS_REQUEST",
+        models.Notification.is_read == False
+    ).count()
+    
+    return {
+        "notifications": [
+            {
+                "id": n.id,
+                "type": n.type,
+                "message": n.message,
+                "is_read": n.is_read,
+                "created_at": n.created_at.isoformat() if n.created_at else None,
+                "metadata": n.metadata_obj
+            }
+            for n in notifs
+        ],
+        "unread_count": sum(1 for n in notifs if not n.is_read),
+        "access_request_count": access_requests
+    }
+
+
+@router.post("/notifications/{notif_id}/read")
+def mark_notification_read(notif_id: int, profile: models.User = Depends(get_current_profile), db: Session = Depends(get_db)):
+    notif = db.query(models.Notification).filter(
+        models.Notification.id == notif_id,
+        models.Notification.user_id == profile.id
+    ).first()
+    if not notif:
+        raise HTTPException(status_code=404, detail="Notification not found")
+    notif.is_read = True  # type: ignore
+    db.commit()
+    return {"detail": "Marked as read"}

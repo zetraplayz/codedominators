@@ -20,8 +20,9 @@ export default function ProfileSetupPage() {
     setError(null);
 
     try {
-      const res = await fetch('/api/me', {
+      const res = await fetch('/api/auth/me', {
         method: 'PUT',
+        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },

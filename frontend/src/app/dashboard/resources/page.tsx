@@ -2,11 +2,12 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, FileText, Download, Lock, Eye, Loader2, Sparkles } from 'lucide-react';
+import Link from 'next/link';
 import { ClayButton } from '@/components/ui/ClayButton';
 import { UploadResourceModal } from '@/components/UploadResourceModal';
+import { AddToKitModal } from '@/components/AddToKitModal';
 import { useSession } from '@/context/session';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://codedominators-five.vercel.app';
 
 interface Resource {
   id: number;
@@ -35,6 +36,7 @@ export default function ResourcesPage() {
   const { user: session, loading: sessionLoading } = useSession();
   const [searchQuery, setSearchQuery]         = useState('');
   const [isUploadOpen, setIsUploadOpen]       = useState(false);
+  const [resourceToKit, setResourceToKit]     = useState<number | null>(null);
   const [resources, setResources]             = useState<Resource[]>([]);
   const [displayedIds, setDisplayedIds]       = useState<number[] | null>(null); // null = show all
   const [dataLoading, setDataLoading]         = useState(true);
@@ -46,7 +48,7 @@ export default function ResourcesPage() {
     setDisplayedIds(null);
     setAiExplanation('');
     try {
-      const r = await fetch(`/api/resources/`);
+      const r = await fetch(`/api/resources/`, { credentials: 'include' });
       if (r.ok) setResources(await r.json());
     } catch { /* backend offline */ }
     finally { setDataLoading(false); }
@@ -64,6 +66,7 @@ export default function ResourcesPage() {
     try {
       const res = await fetch(`/api/ai/search`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 
           'Content-Type': 'application/json',
         },
@@ -89,7 +92,7 @@ export default function ResourcesPage() {
 
   const handleDownload = async (id: number) => {
     try {
-      const res = await fetch(`/api/resources/${id}/download`);
+      const res = await fetch(`/api/resources/${id}/download`, { credentials: 'include' });
       if (!res.ok) {
         alert('Failed to download resource or access denied.');
         return;
@@ -118,7 +121,8 @@ export default function ResourcesPage() {
     if (!confirm('Are you sure you want to delete this resource?')) return;
     try {
       const res = await fetch(`/api/resources/${id}`, { 
-        method: 'DELETE'
+        method: 'DELETE',
+        credentials: 'include',
       });
       if (res.ok) {
         fetchResources();
@@ -223,9 +227,11 @@ export default function ResourcesPage() {
               </div>
 
               <div className="flex-1">
-                <h3 className="font-bold text-[var(--color-base-text)] leading-tight line-clamp-2" title={resource.title}>
-                  {resource.title}
-                </h3>
+                <Link href={`/dashboard/resources/${resource.id}`}>
+                  <h3 className="font-bold text-[var(--color-base-text)] leading-tight line-clamp-2 hover:underline decoration-2 underline-offset-4 cursor-pointer" title={resource.title}>
+                    {resource.title}
+                  </h3>
+                </Link>
                 {resource.description && (
                   <p className="text-[var(--color-base-text)] opacity-50 text-xs font-medium mt-1 line-clamp-2">{resource.description}</p>
                 )}
@@ -250,8 +256,9 @@ export default function ResourcesPage() {
                       
                       {/* Dropdown Menu (Hover based for now) */}
                       <div className="absolute bottom-full right-0 mb-2 w-32 bg-[var(--color-base-mint)] shadow-clay-card rounded-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all flex flex-col overflow-hidden border border-white/20 z-10">
-                        <div className="px-4 py-2.5 text-xs font-bold text-[var(--color-base-text)] hover:bg-[var(--color-base-bg)] transition-colors text-left border-b border-white/10" onClick={() => alert('Edit is coming soon!')}>Edit details</div>
-                        <div className="px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors text-left" onClick={() => handleDelete(resource.id)}>Delete</div>
+                        <Link href={`/dashboard/resources/${resource.id}`} className="px-4 py-2.5 text-xs font-bold text-[var(--color-base-text)] hover:bg-[var(--color-base-bg)] transition-colors text-left border-b border-white/10 text-decoration-none">View Details</Link>
+                        <div className="px-4 py-2.5 text-xs font-bold text-[var(--color-base-text)] hover:bg-[var(--color-base-bg)] transition-colors text-left border-b border-white/10 cursor-pointer" onClick={() => setResourceToKit(resource.id)}>Add to Kit</div>
+                        <div className="px-4 py-2.5 text-xs font-bold text-red-500 hover:bg-red-50 transition-colors text-left cursor-pointer" onClick={() => handleDelete(resource.id)}>Delete</div>
                       </div>
                     </button>
                   )}
@@ -267,6 +274,11 @@ export default function ResourcesPage() {
         onClose={() => setIsUploadOpen(false)}
         onUploadSuccess={fetchResources}
         userId={session.id}
+      />
+      <AddToKitModal
+        isOpen={resourceToKit !== null}
+        onClose={() => setResourceToKit(null)}
+        resourceId={resourceToKit}
       />
     </div>
   );

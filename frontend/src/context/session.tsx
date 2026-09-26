@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, createContext, useContext } from 'react';
+import { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface UserSession {
@@ -10,11 +10,26 @@ interface UserSession {
   role: 'ADMIN' | 'HOD' | 'STAFF';
   department?: string;
   education?: string;
+  designation?: string;
+  employee_id?: string;
+  job_profile?: string;
+  specialization?: string;
+  assigned_courses?: string;
+  mobile_number?: string;
+  short_bio?: string;
+  profile_photo?: string;
 }
 
-const SessionContext = createContext<{user: UserSession | null, loading: boolean}>({
+interface SessionContextType {
+  user: UserSession | null;
+  loading: boolean;
+  refresh: () => Promise<void>;
+}
+
+const SessionContext = createContext<SessionContextType>({
   user: null,
-  loading: true
+  loading: true,
+  refresh: async () => {},
 });
 
 export function useSession() {
@@ -26,25 +41,34 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    fetch('/api/auth/me')
-      .then(res => {
-        if (!res.ok) throw new Error('Unauthorized');
-        return res.json();
-      })
-      .then(data => {
-        setUser(data);
-        setLoading(false);
-      })
-      .catch(() => {
-        setUser(null);
-        setLoading(false);
-        router.push('/login');
-      });
+  const fetchUser = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/me', { credentials: 'include' });
+      if (!res.ok) throw new Error('Unauthorized');
+      const data = await res.json();
+      setUser(data);
+    } catch {
+      setUser(null);
+      router.push('/login');
+    } finally {
+      setLoading(false);
+    }
   }, [router]);
 
+  useEffect(() => {
+    fetchUser();
+  }, [fetchUser]);
+
+  const refresh = useCallback(async () => {
+    const res = await fetch('/api/auth/me', { credentials: 'include' });
+    if (res.ok) {
+      const data = await res.json();
+      setUser(data);
+    }
+  }, []);
+
   return (
-    <SessionContext.Provider value={{ user, loading }}>
+    <SessionContext.Provider value={{ user, loading, refresh }}>
       {children}
     </SessionContext.Provider>
   );

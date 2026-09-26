@@ -50,7 +50,14 @@ _GROK_KEY    = os.getenv("GROK_API_KEY", "")
 
 _GEMINI_CYCLE = itertools.cycle(_GEMINI_KEYS) if _GEMINI_KEYS else None
 
-GEMINI_MODEL = "gemini-1.5-flash"
+# Ordered list of Gemini models to try (newest → fallback)
+GEMINI_MODELS = [
+    "gemini-3.8-flash",
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-flash-latest",
+    "gemini-2.5-flash-lite",
+]
 OPENAI_MODEL = "gpt-4o-mini"
 GROK_MODEL   = "grok-3-mini"
 GROK_BASE    = "https://api.x.ai/v1"
@@ -60,32 +67,35 @@ GROK_BASE    = "https://api.x.ai/v1"
 def _generate(prompt: str) -> tuple[str, str]:
     """
     Returns (text, provider_name).
-    Tries Gemini → OpenAI → Grok in order.
+    Tries Gemini (multiple models) → OpenAI → Grok in order.
     Raises HTTPException if all fail.
     """
     errors = []
 
-    # 1. Gemini
+    # 1. Gemini — try each model in order with the API key
     if HAS_GEMINI and _GEMINI_KEYS:
-        for _ in range(len(_GEMINI_KEYS)):
+        key = next(_GEMINI_CYCLE)  # type: ignore
+        client = _ggenai.Client(api_key=key)
+        for model_name in GEMINI_MODELS:
             try:
-                key = next(_GEMINI_CYCLE)  # type: ignore
-                client = _ggenai.Client(api_key=key)
                 resp = client.models.generate_content(
-                    model=GEMINI_MODEL,
+                    model=model_name,
                     contents=prompt,
                 )
-                return resp.text or "", "Gemini"
-            except GeminiClientError as e:
-                code = getattr(e, "status_code", 0)
-                if code == 429:
-                    errors.append(f"Gemini 429 (key rotated)")
-                    continue
-                errors.append(f"Gemini {code}: {str(e)[:80]}")
-                break
+                return resp.text or "", f"Gemini ({model_name})"
             except Exception as e:
-                errors.append(f"Gemini: {str(e)[:80]}")
-                break
+                err_str = str(e)
+                # 503 = model overloaded, try next model
+                if "503" in err_str or "UNAVAILABLE" in err_str:
+                    errors.append(f"{model_name}: overloaded")
+                    continue
+                # 404 = model not available for this key, try next
+                elif "404" in err_str or "NOT_FOUND" in err_str:
+                    errors.append(f"{model_name}: not available")
+                    continue
+                else:
+                    errors.append(f"Gemini: {err_str[:100]}")
+                    break
 
     # 2. OpenAI
     if HAS_OPENAI and _OPENAI_KEY:
@@ -153,6 +163,19 @@ class SummarizeResponse(BaseModel):
     summary: str
     suggested_tags: List[str]
     suggested_category: str
+    provider: str
+
+class IntentRequest(BaseModel):
+    requirement: str
+
+class IntentResponse(BaseModel):
+    course: str
+    unit: str
+    topics: List[str]
+    purpose: str
+    duration: str
+    difficulty: str
+    resource_types: List[str]
     provider: str
 
 
@@ -251,6 +274,56 @@ CATEGORY: <category>"""
         provider=provider,
     )
 
+@router.post("/intent", response_model=IntentResponse)
+async def extract_intent(req: IntentRequest):
+    prompt = f"""You are an academic curriculum mapping assistant.
+Analyze the following natural-language teaching requirement:
+"{req.requirement}"
+
+Extract the following information:
+1. Course Name (guess if not explicit)
+2. Unit Name/Number (guess if not explicit)
+3. Topics (comma separated)
+4. Purpose (e.g. Lecture, Practical, Assignment, Review)
+5. Duration (e.g. 2 hours)
+6. Difficulty (Beginner, Intermediate, Advanced)
+7. Preferred resource types (comma separated: Lecture Notes, Presentation, Concept Notes, Practical/Lab, Question Bank)
+
+Respond in EXACTLY this format:
+COURSE: <course>
+UNIT: <unit>
+TOPICS: <topics>
+PURPOSE: <purpose>
+DURATION: <duration>
+DIFFICULTY: <difficulty>
+RESOURCE_TYPES: <resource_types>"""
+
+    text, provider = await run_in_threadpool(_generate, prompt)
+    
+    course, unit, purpose, duration, difficulty = "", "", "", "", ""
+    topics, resource_types = [], []
+    
+    for line in text.strip().split("\n"):
+        line = line.strip()
+        if line.startswith("COURSE:"): course = line.replace("COURSE:", "").strip()
+        elif line.startswith("UNIT:"): unit = line.replace("UNIT:", "").strip()
+        elif line.startswith("TOPICS:"): topics = [t.strip() for t in line.replace("TOPICS:", "").split(",") if t.strip()]
+        elif line.startswith("PURPOSE:"): purpose = line.replace("PURPOSE:", "").strip()
+        elif line.startswith("DURATION:"): duration = line.replace("DURATION:", "").strip()
+        elif line.startswith("DIFFICULTY:"): difficulty = line.replace("DIFFICULTY:", "").strip()
+        elif line.startswith("RESOURCE_TYPES:"): resource_types = [t.strip() for t in line.replace("RESOURCE_TYPES:", "").split(",") if t.strip()]
+
+    return IntentResponse(
+        course=course,
+        unit=unit,
+        topics=topics,
+        purpose=purpose,
+        duration=duration,
+        difficulty=difficulty,
+        resource_types=resource_types,
+        provider=provider
+    )
+
 
 @router.get("/health")
 def ai_health():
@@ -265,7 +338,7 @@ def ai_health():
         "status": "ok" if providers else "no_providers",
         "providers_ready": providers,
         "fallback_order": ["Gemini", "OpenAI", "Grok"],
-        "model_gemini": GEMINI_MODEL,
+        "model_gemini": GEMINI_MODELS[0],
         "model_openai": OPENAI_MODEL,
         "model_grok": GROK_MODEL,
     }

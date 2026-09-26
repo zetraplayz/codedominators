@@ -53,8 +53,8 @@ class Resource(Base):
     
     # Relationships
     owner = relationship("User", back_populates="resources")
-    versions = relationship("ResourceVersion", back_populates="resource")
-    permissions = relationship("ResourcePermission", back_populates="resource")
+    versions = relationship("ResourceVersion", back_populates="resource", cascade="all, delete-orphan")
+    permissions = relationship("ResourcePermission", back_populates="resource", cascade="all, delete-orphan")
     forked_from = relationship("Resource", remote_side=[id])
 
 class ResourceVersion(Base):

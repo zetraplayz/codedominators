@@ -35,6 +35,7 @@ export function UploadResourceModal({ isOpen, onClose, onUploadSuccess }: Upload
 
       const response = await fetch('/api/resources/', {
         method: 'POST',
+        credentials: 'include',
         body: formData,
       });
 
