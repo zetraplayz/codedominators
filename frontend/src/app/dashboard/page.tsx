@@ -58,17 +58,20 @@ function timeAgo(dateStr: string): string {
 }
 
 export default function DashboardPage() {
-  const session = useSession();
+  const { user: session, loading: sessionLoading } = useSession();
   const [resources, setResources] = useState<Resource[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
-    fetch(`${API}/api/resources/`)
+    fetch(`/api/resources/`)
       .then(r => r.ok ? r.json() : [])
       .then(data => setResources(Array.isArray(data) ? data : []))
       .catch(() => setResources([]))
-      .finally(() => setLoading(false));
+      .finally(() => setDataLoading(false));
   }, []);
+
+  if (sessionLoading) return <div className="text-[var(--color-base-text)] opacity-50 font-bold p-10 animate-pulse">Loading dashboard...</div>;
+  if (!session) return null;
 
   const myResources = resources.filter(r => r.owner_id === session.id);
   const recentActivity = [...resources]
@@ -91,7 +94,7 @@ export default function DashboardPage() {
       </header>
 
       {/* Stats */}
-      {loading ? (
+      {dataLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {[1,2,3].map(i => (
             <div key={i} className="p-6 rounded-3xl bg-[var(--color-base-mint)] shadow-clay-card animate-pulse h-32" />
@@ -119,7 +122,7 @@ export default function DashboardPage() {
           </a>
         </div>
 
-        {loading ? (
+        {dataLoading ? (
           <div className="space-y-3">
             {[1,2,3].map(i => (
               <div key={i} className="h-16 rounded-2xl bg-[var(--color-base-bg)] shadow-clay-pressed animate-pulse" />

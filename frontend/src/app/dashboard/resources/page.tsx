@@ -32,28 +32,24 @@ function VisibilityBadge({ v }: { v: string }) {
 }
 
 export default function ResourcesPage() {
-  const session = useSession();
+  const { user: session, loading: sessionLoading } = useSession();
   const [searchQuery, setSearchQuery]         = useState('');
   const [isUploadOpen, setIsUploadOpen]       = useState(false);
   const [resources, setResources]             = useState<Resource[]>([]);
   const [displayedIds, setDisplayedIds]       = useState<number[] | null>(null); // null = show all
-  const [loading, setLoading]                 = useState(true);
+  const [dataLoading, setDataLoading]         = useState(true);
   const [aiSearching, setAiSearching]         = useState(false);
   const [aiExplanation, setAiExplanation]     = useState('');
 
   const fetchResources = useCallback(async () => {
-    setLoading(true);
+    setDataLoading(true);
     setDisplayedIds(null);
     setAiExplanation('');
     try {
-      const r = await fetch(`${API}/api/resources/`, {
-        headers: {
-          'Authorization': 'Bearer DEV_TOKEN'
-        }
-      });
+      const r = await fetch(`/api/resources/`);
       if (r.ok) setResources(await r.json());
     } catch { /* backend offline */ }
-    finally { setLoading(false); }
+    finally { setDataLoading(false); }
   }, []);
 
   useEffect(() => { fetchResources(); }, [fetchResources]);
@@ -66,11 +62,10 @@ export default function ResourcesPage() {
     setAiSearching(true);
     setAiExplanation('');
     try {
-      const res = await fetch(`${API}/api/ai/search`, {
+      const res = await fetch(`/api/ai/search`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer DEV_TOKEN'
         },
         body: JSON.stringify({ query: q, resource_titles: resources.map(r => r.title) }),
       });
@@ -94,11 +89,7 @@ export default function ResourcesPage() {
 
   const handleDownload = async (id: number) => {
     try {
-      const res = await fetch(`${API}/api/resources/${id}/download`, {
-        headers: {
-          'Authorization': 'Bearer DEV_TOKEN'
-        }
-      });
+      const res = await fetch(`/api/resources/${id}/download`);
       if (!res.ok) {
         alert('Failed to download resource or access denied.');
         return;
@@ -126,11 +117,8 @@ export default function ResourcesPage() {
   const handleDelete = async (id: number) => {
     if (!confirm('Are you sure you want to delete this resource?')) return;
     try {
-      const res = await fetch(`${API}/api/resources/${id}`, { 
-        method: 'DELETE',
-        headers: {
-          'Authorization': 'Bearer DEV_TOKEN'
-        }
+      const res = await fetch(`/api/resources/${id}`, { 
+        method: 'DELETE'
       });
       if (res.ok) {
         fetchResources();
@@ -145,6 +133,9 @@ export default function ResourcesPage() {
   const displayed = displayedIds === null
     ? resources
     : displayedIds.map(id => resources.find(r => r.id === id)).filter(Boolean) as Resource[];
+
+  if (sessionLoading || dataLoading) return <div className="text-[var(--color-base-text)] opacity-50 p-10 font-bold animate-pulse">Loading vault...</div>;
+  if (!session) return null;
 
   return (
     <div className="space-y-8">
@@ -195,7 +186,7 @@ export default function ResourcesPage() {
       )}
 
       {/* Resource grid */}
-      {loading ? (
+      {dataLoading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
           {[1,2,3].map(i => (
             <div key={i} className="h-48 rounded-3xl bg-[var(--color-base-mint)] shadow-clay-card animate-pulse" />

@@ -4,7 +4,12 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import resources, ai
+from app.api import resources, ai, auth
+from app.core.database import engine, Base
+
+# Create tables locally in SQLite
+Base.metadata.create_all(bind=engine)
+
 app = FastAPI(
     title="Connect Plus API",
     description="Backend API for Connect Plus - Institutional Faculty Resource Platform",
@@ -14,6 +19,7 @@ app = FastAPI(
 # CORS configuration for Next.js frontend
 origins = [
     "http://localhost:3000",
+    "http://127.0.0.1:3000",
     "https://codedominators-five.vercel.app",
     "https://codedominators-fxnjqm3do-zetra.vercel.app",
     "https://codedominators-xkdg.vercel.app",
@@ -31,6 +37,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(resources.router, prefix="/api/resources", tags=["Resources"])
 app.include_router(ai.router, prefix="/api/ai", tags=["AI"])
 

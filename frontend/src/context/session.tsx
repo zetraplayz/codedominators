@@ -1,36 +1,50 @@
 'use client';
 
 import { useState, useEffect, createContext, useContext } from 'react';
+import { useRouter } from 'next/navigation';
 
-// ============================================================
-// SESSION CONTEXT
-// Sample account acts as a real Staff user
-// ============================================================
 interface UserSession {
   id: string;
   email: string;
   name: string;
   role: 'ADMIN' | 'HOD' | 'STAFF';
+  department?: string;
+  education?: string;
 }
 
-const SAMPLE_USER: UserSession = {
-  id: 'sample_faculty_id',
-  email: 'sample@gmail.com',
-  name: 'Sample Faculty',
-  role: 'STAFF',
-};
+const SessionContext = createContext<{user: UserSession | null, loading: boolean}>({
+  user: null,
+  loading: true
+});
 
-const SessionContext = createContext<UserSession>(SAMPLE_USER);
-
-export function useSession(): UserSession {
+export function useSession() {
   return useContext(SessionContext);
 }
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  // In production this reads from Supabase auth
-  // For now: sample@gmail.com is the real active Staff user
+  const [user, setUser] = useState<UserSession | null>(null);
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    fetch('/api/auth/me')
+      .then(res => {
+        if (!res.ok) throw new Error('Unauthorized');
+        return res.json();
+      })
+      .then(data => {
+        setUser(data);
+        setLoading(false);
+      })
+      .catch(() => {
+        setUser(null);
+        setLoading(false);
+        router.push('/login');
+      });
+  }, [router]);
+
   return (
-    <SessionContext.Provider value={SAMPLE_USER}>
+    <SessionContext.Provider value={{ user, loading }}>
       {children}
     </SessionContext.Provider>
   );

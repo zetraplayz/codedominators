@@ -4,8 +4,8 @@ import shutil
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from supabase import create_client, Client
 
 from app.core.database import get_db
 from app import models
@@ -13,11 +13,10 @@ from app.schemas import resource as resource_schema
 
 router = APIRouter()
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-STORAGE_BUCKET = "resources"
+class AccessRequestRespond(BaseModel):
+    action: str
 
-# Local uploads fallback dir (used if Supabase storage fails)
+# Local uploads directory
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
 if os.getenv("VERCEL") == "1":
     UPLOAD_DIR = "/tmp/uploads"
@@ -26,23 +25,6 @@ try:
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 except OSError:
     pass
-
-
-def get_supabase() -> Client:
-    return create_client(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
-
-
-def upload_to_supabase_storage(user_id: str, resource_id: int, file: UploadFile) -> str:
-    """Upload file to Supabase Storage and return the storage path."""
-    supabase = get_supabase()
-    file_bytes = file.file.read()
-    storage_path = f"{user_id}/{resource_id}/{file.filename}"
-    supabase.storage.from_(STORAGE_BUCKET).upload(
-        path=storage_path,
-        file=file_bytes,
-        file_options={"content-type": file.content_type or "application/octet-stream"}
-    )
-    return storage_path
 
 
 MAX_SIZE = 50 * 1024 * 1024
@@ -86,27 +68,12 @@ async def create_resource(
 
     checksum = hashlib.sha256(file_bytes).hexdigest()
     
-    # 2. Storage First (P0.7 UUID key & P0.13 Storage-first)
+    # 2. Local Storage
     storage_key = f"resources/{uuid.uuid4()}{ext}"
-    storage_path = None
-    
-    if SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY:
-        try:
-            supabase = get_supabase()
-            supabase.storage.from_(STORAGE_BUCKET).upload(
-                path=storage_key,
-                file=file_bytes,
-                file_options={"content-type": file.content_type or mimetypes.guess_type(file.filename)[0] or "application/octet-stream"}
-            )
-            storage_path = storage_key
-        except Exception as e:
-            print(f"[WARN] Supabase Storage upload failed: {e}. Falling back to local.")
-            
-    if not storage_path:
-        local_path = os.path.join(UPLOAD_DIR, storage_key.replace("/", "_"))
-        with open(local_path, "wb") as f:
-            f.write(file_bytes)
-        storage_path = local_path
+    local_path = os.path.join(UPLOAD_DIR, storage_key.replace("/", "_"))
+    with open(local_path, "wb") as f:
+        f.write(file_bytes)
+    storage_path = local_path
 
     # Ensure user exists in local DB (Temporary for dev)
     user = db.query(models.User).filter(models.User.id == profile.id).first()
@@ -219,15 +186,7 @@ def download_resource(
         original_filename = path.split("_", 1)[-1] if "_" in os.path.basename(path) else os.path.basename(path)
         return FileResponse(path, filename=original_filename, media_type=latest_version.mime_type or "application/octet-stream")
         
-    # Supabase fetch
-    try:
-        supabase = get_supabase()
-        res = supabase.storage.from_(STORAGE_BUCKET).download(path)
-        return StreamingResponse(io.BytesIO(res), media_type=latest_version.mime_type or "application/octet-stream", headers={
-            "Content-Disposition": f'attachment; filename="{os.path.basename(path)}"'
-        })
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to download from storage: {e}")
+    raise HTTPException(status_code=404, detail="File not found on server")
 
 
 @router.delete("/{resource_id}")

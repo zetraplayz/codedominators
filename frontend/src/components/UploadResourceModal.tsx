@@ -11,9 +11,7 @@ interface UploadResourceModalProps {
   userId?: string;
 }
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://codedominators-five.vercel.app';
-
-export function UploadResourceModal({ isOpen, onClose, onUploadSuccess, userId = 'sample_faculty_id' }: UploadResourceModalProps) {
+export function UploadResourceModal({ isOpen, onClose, onUploadSuccess }: UploadResourceModalProps) {
   const [title, setTitle]           = useState('');
   const [description, setDescription] = useState('');
   const [visibility, setVisibility] = useState('PRIVATE');
@@ -35,11 +33,8 @@ export function UploadResourceModal({ isOpen, onClose, onUploadSuccess, userId =
       formData.append('visibility', visibility);
       formData.append('file', file);
 
-      const response = await fetch(`${API}/api/resources/`, {
+      const response = await fetch('/api/resources/', {
         method: 'POST',
-        headers: {
-          'Authorization': 'Bearer DEV_TOKEN'
-        },
         body: formData,
       });
 

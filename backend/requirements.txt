@@ -11,3 +11,4 @@ openai
 PyJWT
 
 psycopg2-binary>=2.9.0
+passlib[bcrypt]

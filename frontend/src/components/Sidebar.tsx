@@ -3,17 +3,21 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, FolderOpen, Users, Settings, LogOut, BookOpen } from "lucide-react";
+import { useSession } from "@/context/session";
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user } = useSession();
 
   const navItems = [
-    { name: "Dashboard", href: "/dashboard", icon: Home },
-    { name: "Resources", href: "/dashboard/resources", icon: FolderOpen },
-    { name: "Teaching Kits", href: "/dashboard/kits", icon: BookOpen },
-    { name: "Department", href: "/dashboard/department", icon: Users },
-    { name: "Settings", href: "/dashboard/settings", icon: Settings },
+    { name: "Dashboard", href: "/dashboard", icon: Home, roles: ["ADMIN", "HOD", "STAFF"] },
+    { name: "Resources", href: "/dashboard/resources", icon: FolderOpen, roles: ["ADMIN", "HOD", "STAFF"] },
+    { name: "Teaching Kits", href: "/dashboard/kits", icon: BookOpen, roles: ["ADMIN", "HOD", "STAFF"] },
+    { name: "Department", href: "/dashboard/department", icon: Users, roles: ["ADMIN", "HOD"] },
+    { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ["ADMIN", "HOD", "STAFF"] },
   ];
+
+  const visibleNavItems = navItems.filter(item => !user || item.roles.includes(user.role));
 
   return (
     <aside className="w-72 h-screen bg-[var(--color-base-bg)] flex flex-col py-8 z-10 relative border-r border-[var(--color-base-text)]/5">
@@ -30,7 +34,7 @@ export default function Sidebar() {
 
       {/* Nav Links */}
       <nav className="flex flex-col w-full px-6 space-y-2 flex-1">
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
 
@@ -54,7 +58,8 @@ export default function Sidebar() {
       {/* Logout */}
       <div className="w-full px-6 mt-8">
         <button
-          onClick={() => {
+          onClick={async () => {
+            await fetch('/api/auth/logout', { method: 'POST' });
             window.location.href = "/login";
           }}
           className="group flex items-center space-x-4 w-full px-5 py-3.5 rounded-2xl text-red-500/70 font-medium transition-all duration-300 hover:bg-[var(--color-base-mint)] hover:shadow-clay-btn hover:text-red-600"

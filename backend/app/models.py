@@ -20,6 +20,7 @@ class User(Base):
     full_name = Column(String, nullable=False)
     employee_id = Column(String, unique=True, index=True, nullable=False)
     official_email = Column(String, unique=True, index=True, nullable=False)
+    password_hash = Column(String, nullable=True) # Added for local auth
     
     role = Column(String, default="STAFF", nullable=False)
     department_id = Column(Integer, ForeignKey("departments.id"), nullable=True)

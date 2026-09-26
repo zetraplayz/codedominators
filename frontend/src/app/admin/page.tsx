@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ClayButton } from '@/components/ui/ClayButton';
-import { createClient } from '@/utils/supabase/client';
+
 
 export default function AdminPage() {
   const [email, setEmail] = useState('');
@@ -11,7 +11,6 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-  const supabase = createClient();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,12 +22,19 @@ export default function AdminPage() {
       return;
     }
 
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-    if (authError) {
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      if (!res.ok) throw new Error('Invalid credentials');
+      
+      // We assume it sets a cookie, but we can verify role later if needed
+      router.push('/dashboard');
+    } catch {
       setError('Access denied. Invalid credentials.');
       setLoading(false);
-    } else {
-      router.push('/dashboard');
     }
   };
 
