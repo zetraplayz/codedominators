@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, use, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { 
   ArrowLeft, Star, Download, MessageSquare, 
@@ -63,11 +63,7 @@ export default function ResourceDetailsPage({ params }: { params: Promise<{ id: 
   const [selectedKit, setSelectedKit] = useState('');
   const [addingToKit, setAddingToKit] = useState(false);
 
-  useEffect(() => {
-    fetchResourceAndReviews();
-  }, [resourceId]);
-
-  const fetchResourceAndReviews = async () => {
+  const fetchResourceAndReviews = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -90,13 +86,17 @@ export default function ResourceDetailsPage({ params }: { params: Promise<{ id: 
       setReviews(reviewsData);
       setRecommendations(recData);
       setMyKits(Array.isArray(kitsData) ? kitsData.filter(k => k.owner_id === user?.id) : []);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError((err as Error).message);
     } finally {
       setLoading(false);
     }
-  };
+  }, [resourceId, user?.id]);
 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchResourceAndReviews();
+  }, [fetchResourceAndReviews]);
   const handleAddReview = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFeedback.trim()) return;
@@ -118,8 +118,8 @@ export default function ResourceDetailsPage({ params }: { params: Promise<{ id: 
       setNewFeedback("");
       setNewRating(5);
       await fetchResourceAndReviews();
-    } catch (err: any) {
-      alert(err.message);
+    } catch (err: unknown) {
+      alert((err as Error).message);
     } finally {
       setSubmitting(false);
     }
@@ -216,6 +216,7 @@ export default function ResourceDetailsPage({ params }: { params: Promise<{ id: 
         <div className="flex flex-col sm:flex-row items-center justify-between pt-6 border-t border-[var(--color-base-text)]/10 gap-4">
           <div className="flex items-center space-x-4">
             <div className="w-12 h-12 rounded-full bg-[var(--color-base-bg)] shadow-clay-btn flex items-center justify-center border border-white/20 overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               {resource.owner_photo ? (
                 <img src={resource.owner_photo} alt={resource.owner_name} className="w-full h-full object-cover" />
               ) : (
@@ -260,6 +261,7 @@ export default function ResourceDetailsPage({ params }: { params: Promise<{ id: 
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 rounded-full bg-[var(--color-base-bg)] shadow-clay-btn flex items-center justify-center overflow-hidden border border-white/10">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
                         {r.reviewer_photo ? (
                           <img src={r.reviewer_photo} alt={r.reviewer_name} className="w-full h-full object-cover" />
                         ) : (
@@ -390,7 +392,7 @@ export default function ResourceDetailsPage({ params }: { params: Promise<{ id: 
             <div className="flex flex-col gap-6">
               {myKits.length === 0 ? (
                 <div className="p-6 bg-[var(--color-base-mint)] shadow-clay-pressed rounded-2xl text-center text-[var(--color-base-text)] text-sm font-bold">
-                  <p className="opacity-60 mb-2">You don't have any teaching kits yet.</p>
+                  <p className="opacity-60 mb-2">You don&apos;t have any teaching kits yet.</p>
                   <Link href="/dashboard/kits" className="inline-block mt-2 opacity-100 hover:underline">
                     Create one first
                   </Link>

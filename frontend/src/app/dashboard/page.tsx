@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { FileText, BookOpen, Bell, TrendingUp, Clock, Upload, Eye, Lock, Search } from 'lucide-react';
 import { useSession } from '@/context/session';
 
-const API = process.env.NEXT_PUBLIC_API_URL || 'https://codedominators-five.vercel.app';
+import Link from 'next/link';
 
 interface Resource {
   id: number;
@@ -138,18 +138,18 @@ export default function DashboardPage() {
           Access Requests
           {accessRequests > 0 && <span className="ml-2 bg-[var(--color-base-bg)] text-xs px-2 py-0.5 rounded-full shadow-clay-btn">{accessRequests}</span>}
         </a>
-        <a href="/dashboard/resources" className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-[var(--color-base-mint)] shadow-clay-card hover:shadow-clay-pressed transition-all text-[var(--color-base-text)] font-bold">
+        <Link href="/dashboard/resources" className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-[var(--color-base-mint)] shadow-clay-card hover:shadow-clay-pressed transition-all text-[var(--color-base-text)] font-bold">
           <BookOpen size={20} />
           Resource Vault
-        </a>
-        <a href="/dashboard/kits" className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-[var(--color-base-bg)] shadow-clay-card hover:shadow-clay-pressed transition-all text-[var(--color-base-text)] font-bold border border-white/20">
+        </Link>
+        <Link href="/dashboard/kits" className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-[var(--color-base-bg)] shadow-clay-card hover:shadow-clay-pressed transition-all text-[var(--color-base-text)] font-bold border border-white/20">
           <FileText size={20} />
           Teaching Kits
-        </a>
-        <a href="/dashboard/resources" className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-[var(--color-base-mint)] shadow-clay-card hover:shadow-clay-pressed transition-all text-[var(--color-base-text)] font-bold">
+        </Link>
+        <Link href="/dashboard/resources" className="flex items-center gap-2 px-6 py-4 rounded-2xl bg-[var(--color-base-mint)] shadow-clay-card hover:shadow-clay-pressed transition-all text-[var(--color-base-text)] font-bold">
           <Search size={20} />
           AI Search
-        </a>
+        </Link>
       </section>
 
       {/* Recent Activity */}
@@ -161,9 +161,9 @@ export default function DashboardPage() {
             </div>
             <h2 className="text-xl font-bold text-[var(--color-base-text)]">Recent Activity</h2>
           </div>
-          <a href="/dashboard/resources" className="text-xs font-bold text-[var(--color-base-text)] opacity-50 hover:opacity-100 transition-opacity">
+          <Link href="/dashboard/resources" className="text-xs font-bold text-[var(--color-base-text)] opacity-50 hover:opacity-100 transition-opacity">
             View all →
-          </a>
+          </Link>
         </div>
 
         {dataLoading ? (
@@ -179,9 +179,9 @@ export default function DashboardPage() {
             <p className="text-sm opacity-40 text-center max-w-xs">
               Upload your first resource to get started. Your teaching materials will appear here.
             </p>
-            <a href="/dashboard/resources" className="mt-2 px-5 py-2.5 rounded-xl bg-[var(--color-base-bg)] shadow-clay-btn text-sm font-bold text-[var(--color-base-text)] hover:shadow-clay-pressed transition-all">
+            <Link href="/dashboard/resources" className="mt-2 px-5 py-2.5 rounded-xl bg-[var(--color-base-bg)] shadow-clay-btn text-sm font-bold text-[var(--color-base-text)] hover:shadow-clay-pressed transition-all">
               Go to Resource Vault →
-            </a>
+            </Link>
           </div>
         ) : (
           <div className="space-y-3">

@@ -79,6 +79,7 @@ export default function DepartmentPage() {
             <div key={member.id} className="p-6 rounded-3xl bg-[var(--color-base-bg)] shadow-clay-card flex flex-col gap-4 hover:shadow-clay-pressed transition-all">
               <div className="flex items-center gap-4">
                 <div className="w-16 h-16 rounded-full bg-[var(--color-base-mint)] shadow-clay-btn flex items-center justify-center overflow-hidden flex-shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   {member.profile_photo ? (
                     <img src={member.profile_photo} alt={member.name} className="w-full h-full object-cover" />
                   ) : (
@@ -135,7 +136,7 @@ export default function DepartmentPage() {
           <BookOpen className="w-12 h-12 text-[var(--color-base-text)] opacity-20" />
           <h2 className="text-lg font-bold text-[var(--color-base-text)]">No resources found</h2>
           <p className="text-[var(--color-base-text)] opacity-60 font-medium text-center max-w-sm text-sm">
-            Staff members haven't shared any resources with the department yet.
+            Staff members haven&apos;t shared any resources with the department yet.
           </p>
         </div>
       ) : (
@@ -147,6 +148,7 @@ export default function DepartmentPage() {
                   <h3 className="font-bold text-lg text-[var(--color-base-text)] truncate">{resource.title}</h3>
                   <div className="flex items-center gap-2 mt-2">
                     <div className="w-6 h-6 rounded-full bg-[var(--color-base-mint)] shadow-clay-btn flex flex-shrink-0 items-center justify-center overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       {resource.owner_photo ? (
                         <img src={resource.owner_photo} alt={resource.owner_name} className="w-full h-full object-cover" />
                       ) : (

@@ -56,6 +56,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   }, [router]);
 
   useEffect(() => {
+    // eslint-disable-next-line
     fetchUser();
   }, [fetchUser]);
 

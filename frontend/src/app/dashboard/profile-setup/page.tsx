@@ -6,10 +6,8 @@ import { ClayButton } from '@/components/ui/ClayButton';
 import { useSession } from '@/context/session';
 
 export default function ProfileSetupPage() {
-  const { user, loading: sessionLoading } = useSession();
-  const [department, setDepartment] = useState('');
+  const { loading: sessionLoading } = useSession();
   const [education, setEducation] = useState('');
-  const [role, setRole] = useState('STAFF');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -27,9 +25,7 @@ export default function ProfileSetupPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          department,
-          education,
-          role,
+          education
         }),
       });
 
@@ -39,8 +35,8 @@ export default function ProfileSetupPage() {
 
       router.push('/dashboard');
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Something went wrong');
     } finally {
       setLoading(false);
     }
@@ -56,17 +52,6 @@ export default function ProfileSetupPage() {
         
         <form onSubmit={handleUpdate} className="flex flex-col gap-5">
           <div className="flex flex-col gap-2">
-            <label className="text-sm font-bold text-[var(--color-base-text)] opacity-70">Department</label>
-            <input 
-              required
-              value={department}
-              onChange={e => setDepartment(e.target.value)}
-              placeholder="e.g. Computer Science"
-              className="px-5 py-3.5 rounded-xl shadow-clay-pressed bg-[var(--color-base-mint)] outline-none text-[var(--color-base-text)] font-medium"
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
             <label className="text-sm font-bold text-[var(--color-base-text)] opacity-70">Education / Qualifications</label>
             <input 
               required
@@ -75,19 +60,6 @@ export default function ProfileSetupPage() {
               placeholder="e.g. Ph.D. in AI"
               className="px-5 py-3.5 rounded-xl shadow-clay-pressed bg-[var(--color-base-mint)] outline-none text-[var(--color-base-text)] font-medium"
             />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label className="text-sm font-bold text-[var(--color-base-text)] opacity-70">Job Role</label>
-            <select 
-              value={role}
-              onChange={e => setRole(e.target.value)}
-              className="px-5 py-3.5 rounded-xl shadow-clay-pressed bg-[var(--color-base-mint)] outline-none text-[var(--color-base-text)] font-medium"
-            >
-              <option value="STAFF">Staff Member</option>
-              <option value="HOD">Head of Department</option>
-              <option value="ADMIN">System Administrator</option>
-            </select>
           </div>
 
           {error && <p className="text-red-500 text-sm font-bold text-center mt-2">{error}</p>}

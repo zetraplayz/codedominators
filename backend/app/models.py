@@ -141,3 +141,38 @@ class TeachingKitResource(Base):
     resource_id = Column(Integer, ForeignKey("resources.id"), nullable=False)
     added_at = Column(DateTime(timezone=True), server_default=func.now())
 
+class SystemSettings(Base):
+    __tablename__ = "system_settings"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key = Column(String, unique=True, index=True, nullable=False)
+    value = Column(String, nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id = Column(String, primary_key=True, index=True)  # UUID
+    user_a_id = Column(String, ForeignKey("users.id"), nullable=False)
+    user_b_id = Column(String, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    messages = relationship("ConversationMessage", back_populates="conversation", cascade="all, delete-orphan")
+
+
+class ConversationMessage(Base):
+    __tablename__ = "conversation_messages"
+
+    id = Column(String, primary_key=True, index=True)  # UUID
+    conversation_id = Column(String, ForeignKey("conversations.id"), nullable=False)
+    sender_id = Column(String, ForeignKey("users.id"), nullable=False)
+    content = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    conversation = relationship("Conversation", back_populates="messages")
+    sender = relationship("User", foreign_keys=[sender_id])
+
+

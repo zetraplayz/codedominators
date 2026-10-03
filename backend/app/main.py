@@ -4,7 +4,7 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.api import resources, ai, auth, kits, departments, admin
+from app.api import resources, ai, auth, kits, departments, admin, calls, conversations
 from app.core.database import engine, Base
 
 # Create tables locally in SQLite
@@ -37,12 +37,59 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Basic Rate Limiting Middleware (in-memory, per-IP)
+from fastapi import Request
+from fastapi.responses import JSONResponse
+import time
+
+request_counts = {}
+RATE_LIMIT_DURATION = 60 # seconds
+RATE_LIMIT_REQUESTS = 100 # max requests per IP per minute
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    client_ip = request.client.host if request.client else "unknown"
+    current_time = time.time()
+    
+    if client_ip not in request_counts:
+        request_counts[client_ip] = {"count": 1, "start_time": current_time}
+    else:
+        # Reset if duration passed
+        if current_time - request_counts[client_ip]["start_time"] > RATE_LIMIT_DURATION:
+            request_counts[client_ip] = {"count": 1, "start_time": current_time}
+        else:
+            request_counts[client_ip]["count"] += 1
+            if request_counts[client_ip]["count"] > RATE_LIMIT_REQUESTS:
+                return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded. Please try again later."})
+                
+    response = await call_next(request)
+    return response
+
+# Audit Logging Middleware for critical actions
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("audit")
+
+@app.middleware("http")
+async def audit_log_middleware(request: Request, call_next):
+    method = request.method
+    path = request.url.path
+    if method in ["POST", "PUT", "DELETE"] and not path.startswith("/api/calls/ws"):
+        client_ip = request.client.host if request.client else "unknown"
+        # We log the attempt, we don't have the user ID easily available here without decoding JWT
+        logger.info(f"AUDIT: [{method}] {path} from IP: {client_ip}")
+        
+    response = await call_next(request)
+    return response
+
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(resources.router, prefix="/api/resources", tags=["Resources"])
 app.include_router(kits.router, prefix="/api/kits", tags=["Kits"])
 app.include_router(departments.router, prefix="/api/departments", tags=["Departments"])
 app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
 app.include_router(ai.router, prefix="/api/ai", tags=["AI"])
+app.include_router(calls.router, prefix="/api/calls", tags=["Calls"])
+app.include_router(conversations.router, prefix="/api/conversations", tags=["Conversations"])
 
 @app.get("/health")
 def health_check():

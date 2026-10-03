@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Connect Plus | Institutional Faculty Platform",
+  title: "RIT Connect Plus",
   description: "Unified intelligence and resource sharing platform for HODs, Faculty, and Administrators",
 };
 

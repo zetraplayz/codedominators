@@ -38,13 +38,10 @@ export default function SignupPage() {
         throw new Error(errorData.detail || 'Signup failed');
       }
 
-      // No need to set cookie manually, rewrite proxy passes the Set-Cookie header directly!
-      const data = await res.json();
-
-      router.push('/dashboard/profile-setup');
+      router.push('/dashboard');
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || 'Signup failed. Please try again.');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Signup failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -52,25 +49,25 @@ export default function SignupPage() {
 
   return (
     <div className="h-screen flex items-center justify-center bg-[var(--color-base-bg)] overflow-hidden relative px-4">
-
-      {/* Background blobs */}
       <div className="absolute top-[-60px] left-[-60px] w-60 h-60 rounded-full bg-[var(--color-base-mint)] opacity-70 blur-3xl pointer-events-none"></div>
       <div className="absolute bottom-[-60px] right-[-60px] w-80 h-80 rounded-full bg-[var(--color-base-yellow)] opacity-50 blur-3xl pointer-events-none"></div>
 
       <div className="w-full max-w-sm z-10">
-        {/* Card */}
         <div className="p-8 rounded-[2rem] bg-[var(--color-base-mint)] shadow-clay-card flex flex-col gap-7 border border-white/30">
-          
-          {/* Header */}
           <div className="flex flex-col items-center gap-3">
             <div className="text-center">
-              <h1 className="text-2xl font-extrabold text-[var(--color-base-text)] tracking-tight">Create Account</h1>
-              <p className="text-sm text-[var(--color-base-text)] opacity-60 font-medium mt-1">Join Connect Plus</p>
+              <h1 className="text-2xl font-extrabold text-[var(--color-base-text)] tracking-tight">System Initialization</h1>
+              <p className="text-sm text-[var(--color-base-text)] opacity-60 font-medium mt-1">Admin First-Boot Setup Only</p>
             </div>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleSignup} className="flex flex-col gap-4">
+            <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-xl mb-2">
+              <p className="text-xs text-yellow-800 font-medium text-center">
+                Accounts are provisioned by the Administrator. This form is only active for the very first ADMIN account creation.
+              </p>
+            </div>
+
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-bold text-[var(--color-base-text)] px-1 uppercase tracking-wider opacity-70">Full Name</label>
               <input
@@ -78,7 +75,7 @@ export default function SignupPage() {
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Dr. John Doe"
+                placeholder="Admin Name"
                 className="px-5 py-3.5 rounded-xl shadow-clay-pressed bg-[var(--color-base-bg)] outline-none text-[var(--color-base-text)] font-medium text-sm placeholder:opacity-40 focus:ring-2 focus:ring-[var(--color-base-text)]/30 transition-all"
               />
             </div>
@@ -90,19 +87,19 @@ export default function SignupPage() {
                 required
                 value={employeeId}
                 onChange={(e) => setEmployeeId(e.target.value)}
-                placeholder="EMP12345"
+                placeholder="ADMIN001"
                 className="px-5 py-3.5 rounded-xl shadow-clay-pressed bg-[var(--color-base-bg)] outline-none text-[var(--color-base-text)] font-medium text-sm placeholder:opacity-40 focus:ring-2 focus:ring-[var(--color-base-text)]/30 transition-all"
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-[var(--color-base-text)] px-1 uppercase tracking-wider opacity-70">Email</label>
+              <label className="text-xs font-bold text-[var(--color-base-text)] px-1 uppercase tracking-wider opacity-70">Institutional Email</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="faculty@institution.edu"
+                placeholder="admin@ritrjpm.ac.in"
                 className="px-5 py-3.5 rounded-xl shadow-clay-pressed bg-[var(--color-base-bg)] outline-none text-[var(--color-base-text)] font-medium text-sm placeholder:opacity-40 focus:ring-2 focus:ring-[var(--color-base-text)]/30 transition-all"
               />
             </div>
@@ -114,7 +111,7 @@ export default function SignupPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="DD-MM-YYYY"
                 className="px-5 py-3.5 rounded-xl shadow-clay-pressed bg-[var(--color-base-bg)] outline-none text-[var(--color-base-text)] font-medium text-sm placeholder:opacity-40 focus:ring-2 focus:ring-[var(--color-base-text)]/30 transition-all"
               />
             </div>
@@ -126,11 +123,11 @@ export default function SignupPage() {
             )}
 
             <ClayButton type="submit" variant="primary" className="w-full py-3.5 mt-2" disabled={loading}>
-              {loading ? 'Creating...' : 'Sign Up'}
+              {loading ? 'Initializing...' : 'Initialize System'}
             </ClayButton>
             
             <div className="text-center mt-2">
-              <span className="text-sm text-[var(--color-base-text)] opacity-70">Already have an account? </span>
+              <span className="text-sm text-[var(--color-base-text)] opacity-70">Already initialized? </span>
               <Link href="/login" className="text-sm font-bold text-blue-600 hover:underline">
                 Log in
               </Link>

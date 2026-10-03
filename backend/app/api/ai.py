@@ -14,8 +14,9 @@ import logging
 from typing import List, Optional
 from fastapi.concurrency import run_in_threadpool
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
+from app.api.auth import get_current_profile
 
 logger = logging.getLogger("mesh_ai")
 
@@ -188,7 +189,7 @@ _SYSTEM = (
 
 
 @router.post("/ask", response_model=AskResponse)
-async def ask_ai(req: AskRequest):
+async def ask_ai(req: AskRequest, current_user = Depends(get_current_profile)):
     context_block = f"\n\nResources available:\n{req.context}" if req.context else ""
     history_block = ""
     for m in (req.history or []):
@@ -201,7 +202,7 @@ async def ask_ai(req: AskRequest):
 
 
 @router.post("/search", response_model=SearchResponse)
-async def semantic_search(req: SearchRequest):
+async def semantic_search(req: SearchRequest, current_user = Depends(get_current_profile)):
     if not req.resource_titles:
         return SearchResponse(ranked_titles=[], explanation="No resources to search.", provider="none")
 
@@ -240,7 +241,7 @@ EXPLANATION: <one line reason for top result>"""
 
 
 @router.post("/summarize", response_model=SummarizeResponse)
-async def summarize_resource(req: SummarizeRequest):
+async def summarize_resource(req: SummarizeRequest, current_user = Depends(get_current_profile)):
     prompt = f"""You are an academic resource classifier for a faculty platform.
 
 Title: {req.title}
@@ -275,7 +276,7 @@ CATEGORY: <category>"""
     )
 
 @router.post("/intent", response_model=IntentResponse)
-async def extract_intent(req: IntentRequest):
+async def extract_intent(req: IntentRequest, current_user = Depends(get_current_profile)):
     prompt = f"""You are an academic curriculum mapping assistant.
 Analyze the following natural-language teaching requirement:
 "{req.requirement}"

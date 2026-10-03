@@ -31,13 +31,15 @@ def get_password_hash(password):
 
 @router.post("/register")
 def register(user_in: UserRegister, response: Response, db: Session = Depends(get_db)):
-    user = db.query(models.User).filter(
-        (models.User.official_email == user_in.email) |
-        (models.User.employee_id == user_in.employee_id)
-    ).first()
-    
-    if user:
-        raise HTTPException(status_code=400, detail="User with this email or employee ID already exists")
+    # RIT Connect Plus is Admin-provisioned only.
+    # However, to allow the FIRST admin to register (bootstrap), we allow registration
+    # ONLY if there are no users in the system yet.
+    user_count = db.query(models.User).count()
+    if user_count > 0:
+        raise HTTPException(status_code=403, detail="Self-registration is disabled. Please contact the Administrator.")
+        
+    if not user_in.email.endswith("@ritrjpm.ac.in"):
+        raise HTTPException(status_code=400, detail="Only @ritrjpm.ac.in institutional emails are allowed.")
     
     user_id = str(uuid.uuid4())
     db_user = models.User(
@@ -46,7 +48,7 @@ def register(user_in: UserRegister, response: Response, db: Session = Depends(ge
         official_email=user_in.email,
         employee_id=user_in.employee_id,
         password_hash=get_password_hash(user_in.password),
-        role="STAFF"
+        role="ADMIN" # First user is always ADMIN
     )
     db.add(db_user)
     db.commit()
@@ -98,7 +100,6 @@ def get_me(profile: models.User = Depends(get_current_profile)):
 
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
-    department: Optional[str] = None
     education: Optional[str] = None
     designation: Optional[str] = None
     job_profile: Optional[str] = None
@@ -112,14 +113,6 @@ class UserUpdate(BaseModel):
 def update_me(update_data: UserUpdate, profile: models.User = Depends(get_current_profile), db: Session = Depends(get_db)):
     if update_data.full_name is not None:
         profile.full_name = update_data.full_name  # type: ignore
-    if update_data.department is not None:
-        dept = db.query(models.Department).filter(models.Department.name == update_data.department).first()
-        if not dept:
-            dept = models.Department(name=update_data.department)
-            db.add(dept)
-            db.commit()
-            db.refresh(dept)
-        profile.department_id = dept.id  # type: ignore
     if update_data.education is not None:
         profile.education = update_data.education  # type: ignore
     if update_data.designation is not None:

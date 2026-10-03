@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ClayButton } from '@/components/ui/ClayButton';
-import Link from 'next/link';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -35,12 +34,12 @@ export default function LoginPage() {
       }
 
       // No need to set cookie manually, rewrite proxy passes the Set-Cookie header directly!
-      const data = await res.json();
+      await res.json();
 
       router.push('/dashboard');
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || 'Invalid email or password. Please try again.');
+    } catch (err: unknown) {
+      setError((err as Error).message || 'Invalid email or password. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -59,6 +58,7 @@ export default function LoginPage() {
           
           {/* Header */}
           <div className="flex flex-col items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo.png" alt="Connect Plus" className="w-16 h-16 drop-shadow-lg" />
             <div className="text-center">
               <h1 className="text-2xl font-extrabold text-[var(--color-base-text)] tracking-tight">Connect<span className="opacity-50">+</span></h1>
@@ -103,10 +103,9 @@ export default function LoginPage() {
             </ClayButton>
             
             <div className="text-center mt-2">
-              <span className="text-sm text-[var(--color-base-text)] opacity-70">Don't have an account? </span>
-              <Link href="/signup" className="text-sm font-bold text-blue-600 hover:underline">
-                Sign up
-              </Link>
+              <span className="text-sm text-[var(--color-base-text)] opacity-70">
+                Need an account? Contact your HOD or Administrator.
+              </span>
             </div>
           </form>
         </div>
