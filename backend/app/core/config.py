@@ -20,3 +20,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 settings = Settings()
+
+# Security Hardening: Enforce secrets in production
+if settings.ENVIRONMENT == "production":
+    if settings.SECRET_KEY == "MESH_super_secret_key_2026":
+        raise ValueError("FATAL SECURITY ERROR: Default SECRET_KEY is used in production. Please set SECRET_KEY in .env")
+    if settings.SUPABASE_JWT_SECRET == "dummy_secret_for_dev":
+        raise ValueError("FATAL SECURITY ERROR: Default SUPABASE_JWT_SECRET is used in production. Please set SUPABASE_JWT_SECRET in .env")

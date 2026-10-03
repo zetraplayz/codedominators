@@ -8,12 +8,14 @@ router = APIRouter()
 
 @router.get("/")
 def get_department_members(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_profile)):
-    if not current_user.department_id:
+    if current_user.role == "ADMIN":
+        members = db.query(models.User).all()
+    elif current_user.department_id:
+        members = db.query(models.User).filter(
+            models.User.department_id == current_user.department_id
+        ).all()
+    else:
         return []
-        
-    members = db.query(models.User).filter(
-        models.User.department_id == current_user.department_id
-    ).all()
     
     result = []
     for member in members:
@@ -30,24 +32,26 @@ def get_department_members(db: Session = Depends(get_db), current_user: models.U
 
 @router.get("/resources")
 def get_department_resources(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_profile)):
-    if not current_user.department_id:
-        return []
-        
-    if current_user.role == "HOD":
-        # HOD can view all resources in their department
-        resources = db.query(models.Resource).join(models.User).filter(
-            models.User.department_id == current_user.department_id
-        ).all()
+    if current_user.role == "ADMIN":
+        resources = db.query(models.Resource).all()
+    elif current_user.department_id:
+        if current_user.role == "HOD":
+            # HOD can view all resources in their department
+            resources = db.query(models.Resource).join(models.User).filter(
+                models.User.department_id == current_user.department_id
+            ).all()
+        else:
+            # STAFF can view non-private resources in their department, or their own
+            from sqlalchemy import or_
+            resources = db.query(models.Resource).join(models.User).filter(
+                models.User.department_id == current_user.department_id,
+                or_(
+                    models.Resource.visibility != "PRIVATE",
+                    models.Resource.owner_id == current_user.id
+                )
+            ).all()
     else:
-        # STAFF can view non-private resources in their department, or their own
-        from sqlalchemy import or_
-        resources = db.query(models.Resource).join(models.User).filter(
-            models.User.department_id == current_user.department_id,
-            or_(
-                models.Resource.visibility != "PRIVATE",
-                models.Resource.owner_id == current_user.id
-            )
-        ).all()
+        return []
     
     result = []
     for r in resources:

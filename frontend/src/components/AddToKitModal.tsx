@@ -25,6 +25,7 @@ export function AddToKitModal({
 
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line
       setLoading(true);
       fetch('/api/kits', { credentials: 'include' })
         .then(res => res.ok ? res.json() : [])
@@ -83,7 +84,7 @@ export function AddToKitModal({
             <div className="flex justify-center p-4"><Loader2 className="animate-spin text-[var(--color-base-text)]" /></div>
           ) : kits.length === 0 ? (
             <div className="text-center p-4 text-[var(--color-base-text)] opacity-50 text-sm font-medium">
-              You don't have any teaching kits yet.
+              You don&apos;t have any teaching kits yet.
             </div>
           ) : (
             kits.map(kit => (

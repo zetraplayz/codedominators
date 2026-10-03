@@ -27,7 +27,7 @@ def list_kits(db: Session = Depends(get_db), current_user: models.User = Depends
     
     result = []
     for kit in kits:
-        if kit.owner_id != current_user.id:
+        if kit.owner_id != current_user.id and current_user.role != "ADMIN":
             if kit.visibility == "PRIVATE":
                 continue
             elif kit.visibility == "DEPARTMENT_DISCOVERABLE":
@@ -87,8 +87,13 @@ def add_resource_to_kit(kit_id: int, req: KitResourceAdd, db: Session = Depends(
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
         
-    if resource.owner_id != current_user.id and resource.visibility == "PRIVATE":
-        raise HTTPException(status_code=403, detail="Forbidden. You do not have permission to use this resource.")
+    if resource.owner_id != current_user.id and current_user.role != "ADMIN":
+        if resource.visibility == "PRIVATE":
+            raise HTTPException(status_code=403, detail="Forbidden. You do not have permission to use this resource.")
+        elif resource.visibility == "DEPARTMENT_DISCOVERABLE":
+            owner = db.query(models.User).filter(models.User.id == resource.owner_id).first()
+            if owner and owner.department_id != current_user.department_id:
+                raise HTTPException(status_code=403, detail="Forbidden. Resource is not in your department.")
         
     existing = db.query(models.TeachingKitResource).filter(
         models.TeachingKitResource.kit_id == kit_id,
@@ -110,7 +115,7 @@ def get_kit_details(kit_id: int, db: Session = Depends(get_db), current_user: mo
     if not kit:
         raise HTTPException(status_code=404, detail="Kit not found")
         
-    if kit.owner_id != current_user.id:
+    if kit.owner_id != current_user.id and current_user.role != "ADMIN":
         if kit.visibility == "PRIVATE":
             raise HTTPException(status_code=403, detail="Not authorized to view this kit")
         elif kit.visibility == "DEPARTMENT_DISCOVERABLE":
@@ -145,7 +150,10 @@ def get_kit_details(kit_id: int, db: Session = Depends(get_db), current_user: mo
 
 @router.delete("/{kit_id}")
 def delete_kit(kit_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_profile)):
-    kit = db.query(models.TeachingKit).filter(models.TeachingKit.id == kit_id, models.TeachingKit.owner_id == current_user.id).first()
+    if current_user.role == "ADMIN":
+        kit = db.query(models.TeachingKit).filter(models.TeachingKit.id == kit_id).first()
+    else:
+        kit = db.query(models.TeachingKit).filter(models.TeachingKit.id == kit_id, models.TeachingKit.owner_id == current_user.id).first()
     if not kit:
         raise HTTPException(status_code=404, detail="Kit not found or not owned by you")
     

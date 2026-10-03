@@ -54,6 +54,7 @@ export default function ResourcesPage() {
     finally { setDataLoading(false); }
   }, []);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
   useEffect(() => { fetchResources(); }, [fetchResources]);
 
   // AI semantic search

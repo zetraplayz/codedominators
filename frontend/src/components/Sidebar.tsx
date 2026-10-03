@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, FolderOpen, Users, Settings, LogOut, BookOpen, Bell, Shield, MessageSquare, Target } from "lucide-react";
+import { Home, FolderOpen, Users, Settings, LogOut, BookOpen, Bell, Shield, MessageSquare, Target, PhoneCall } from "lucide-react";
 import { useSession } from "@/context/session";
 import { useState, useEffect } from "react";
 
@@ -10,6 +10,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { user } = useSession();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [patchNote, setPatchNote] = useState<{version: string, content: string} | null>(null);
 
   useEffect(() => {
     const fetchBadge = () => {
@@ -18,9 +19,27 @@ export default function Sidebar() {
         .then(data => setUnreadCount(data.unread_count || 0))
         .catch(() => {});
     };
+    
+    const fetchSettings = () => {
+      fetch('/api/admin/settings', { credentials: 'include' })
+        .then(res => res.ok ? res.json() : {})
+        .then((data: Record<string, string>) => {
+          if (data.PATCH_NOTE_VERSION && data.PATCH_NOTE_CONTENT) {
+            setPatchNote({ version: data.PATCH_NOTE_VERSION, content: data.PATCH_NOTE_CONTENT });
+          } else {
+            setPatchNote(null);
+          }
+        })
+        .catch(() => {});
+    };
+
     fetchBadge();
-    // Refresh badge every 60 seconds
-    const interval = setInterval(fetchBadge, 60000);
+    fetchSettings();
+    // Refresh every 60 seconds
+    const interval = setInterval(() => {
+      fetchBadge();
+      fetchSettings();
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -31,8 +50,9 @@ export default function Sidebar() {
     { name: "Teaching Intents", href: "/dashboard/intents", icon: Target, roles: ["ADMIN", "HOD", "STAFF"] },
     { name: "Department", href: "/dashboard/department", icon: Users, roles: ["ADMIN", "HOD"] },
     { name: "Conversation", href: "/dashboard/conversation", icon: MessageSquare, roles: ["ADMIN", "HOD", "STAFF"] },
+    { name: "Calls & Meetings", href: "/dashboard/calls", icon: PhoneCall, roles: ["ADMIN", "HOD", "STAFF"] },
     { name: "Notifications", href: "/dashboard/notifications", icon: Bell, roles: ["ADMIN", "HOD", "STAFF"], badge: unreadCount },
-    { name: "Admin Panel", href: "/dashboard/admin", icon: Shield, roles: ["ADMIN"] },
+    { name: "Code Dominator", href: "/dashboard/admin", icon: Shield, roles: ["ADMIN"] },
     { name: "Settings", href: "/dashboard/settings", icon: Settings, roles: ["ADMIN", "HOD", "STAFF"] },
   ];
 
@@ -43,6 +63,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="flex items-center gap-4 px-8 mb-12">
         <div className="p-2 bg-[var(--color-base-mint)] rounded-2xl shadow-clay-btn">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/logo.png" alt="Connect Plus Logo" className="w-10 h-10 drop-shadow-sm" />
         </div>
         <div className="flex flex-col">
@@ -56,7 +77,7 @@ export default function Sidebar() {
         {visibleNavItems.map((item) => {
           const isActive = pathname === item.href;
           const Icon = item.icon;
-          const badge = (item as any).badge as number | undefined;
+          const badge = (item as { badge?: number }).badge;
 
           return (
             <Link
@@ -82,11 +103,28 @@ export default function Sidebar() {
         })}
       </nav>
 
+      {/* Patch Update Bar */}
+      {patchNote && (
+        <div className="mx-6 mb-4 p-4 rounded-2xl bg-[var(--color-base-mint)] border border-[var(--color-base-text)]/5 shadow-clay-btn relative overflow-hidden group cursor-pointer transition-all hover:shadow-clay-pressed">
+          <div className="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-bold px-2 py-0.5 rounded-bl-lg z-10 shadow-sm">
+            v{patchNote.version}
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-bold text-[var(--color-base-text)] uppercase tracking-wider opacity-60">Latest Update</span>
+            <p className="text-xs font-medium text-[var(--color-base-text)] opacity-90 leading-snug line-clamp-3">
+              {patchNote.content}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* User info */}
       {user && (
         <div className="mx-6 mb-4 p-4 rounded-2xl bg-[var(--color-base-mint)] shadow-clay-pressed">
           <p className="text-xs font-extrabold text-[var(--color-base-text)] truncate">{user.name}</p>
-          <p className="text-[10px] font-bold text-[var(--color-base-text)] opacity-50 uppercase tracking-widest mt-0.5">{user.role}</p>
+          <p className="text-[10px] font-bold text-[var(--color-base-text)] opacity-50 uppercase tracking-widest mt-0.5">
+            {user.role === 'ADMIN' ? 'Code Dominator' : user.role}
+          </p>
         </div>
       )}
 
@@ -95,6 +133,7 @@ export default function Sidebar() {
         <button
           onClick={async () => {
             await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+            // eslint-disable-next-line @next/next/no-location-assign-relative-destination
             window.location.href = "/login";
           }}
           className="group flex items-center space-x-4 w-full px-5 py-3.5 rounded-2xl text-red-500/70 font-medium transition-all duration-300 hover:bg-[var(--color-base-mint)] hover:shadow-clay-btn hover:text-red-600"

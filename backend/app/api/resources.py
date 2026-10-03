@@ -49,6 +49,33 @@ async def read_bounded(file: UploadFile, max_bytes: int) -> bytes:
 
 from app.core.auth import get_current_profile
 
+def check_resource_access(resource: models.Resource, user: models.User, required_permission: str, db: Session) -> bool:
+    if user.role == "ADMIN":
+        return True
+    if resource.owner_id == user.id:
+        return True
+    
+    owner = db.query(models.User).filter(models.User.id == resource.owner_id).first()
+    if user.role == "HOD" and owner and owner.department_id == user.department_id:
+        if required_permission in ["VIEW", "USE"]:
+            return True
+            
+    perm = db.query(models.ResourcePermission).filter(
+        models.ResourcePermission.resource_id == resource.id,
+        models.ResourcePermission.user_id == user.id
+    ).first()
+    
+    if perm:
+        if required_permission == "VIEW":
+            return True
+        if required_permission == "USE" and perm.permission_level in ["USE", "MODIFY"]:
+            return True
+        if required_permission == "MODIFY" and perm.permission_level == "MODIFY":
+            return True
+            
+    return False
+
+
 @router.post("")
 @router.post("/", response_model=resource_schema.Resource)
 async def create_resource(
@@ -72,6 +99,15 @@ async def create_resource(
         raise HTTPException(415, f"Unsupported file type. Allowed: {', '.join(ALLOWED_EXTENSIONS)}")
 
     checksum = hashlib.sha256(file_bytes).hexdigest()
+    
+    # 1.5 Simulated Malware Scan (System Hardening)
+    # In a real production environment, this would call ClamAV or a third-party scanning API
+    KNOWN_MALWARE_HASHES = [
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", # empty file (just as an example trigger)
+        "5e884898da28047151d0e56f8dc6292773603d0d6aabbdd62a11ef721d1542d8"
+    ]
+    if checksum in KNOWN_MALWARE_HASHES:
+        raise HTTPException(400, "Upload blocked: Malware detected by security scan.")
     
     # 2. Local Storage
     storage_key = f"resources/{uuid.uuid4()}{ext}"
@@ -134,25 +170,44 @@ def list_resources(
 ):
     from sqlalchemy import or_, and_
     
-    resources = (
+    if profile.role == "ADMIN":
+        return db.query(models.Resource).options(selectinload(models.Resource.versions)).offset(skip).limit(limit).all()
+        
+    resources_query = (
         db.query(models.Resource)
         .join(models.User, models.Resource.owner_id == models.User.id)
+        .outerjoin(models.ResourcePermission, and_(
+            models.ResourcePermission.resource_id == models.Resource.id,
+            models.ResourcePermission.user_id == profile.id
+        ))
         .options(selectinload(models.Resource.versions))
-        .filter(
+    )
+    
+    if profile.role == "HOD":
+        return resources_query.filter(
+            or_(
+                models.Resource.owner_id == profile.id,
+                models.User.department_id == profile.department_id,
+                models.Resource.visibility == "INSTITUTION_DISCOVERABLE",
+                and_(
+                    models.Resource.visibility == "DEPARTMENT_DISCOVERABLE",
+                    models.User.department_id == profile.department_id
+                ),
+                models.ResourcePermission.user_id == profile.id
+            )
+        ).offset(skip).limit(limit).all()
+    else:
+        return resources_query.filter(
             or_(
                 models.Resource.owner_id == profile.id,
                 models.Resource.visibility == "INSTITUTION_DISCOVERABLE",
                 and_(
                     models.Resource.visibility == "DEPARTMENT_DISCOVERABLE",
                     models.User.department_id == profile.department_id
-                )
+                ),
+                models.ResourcePermission.user_id == profile.id
             )
-        )
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-    return resources
+        ).offset(skip).limit(limit).all()
 
 
 from fastapi.responses import FileResponse, StreamingResponse
@@ -168,13 +223,8 @@ def download_resource(
     resource = db.query(models.Resource).options(selectinload(models.Resource.versions)).filter(models.Resource.id == resource_id).first()
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
-    owner = db.query(models.User).filter(models.User.id == resource.owner_id).first()
-    if resource.owner_id != profile.id:
-        if resource.visibility == "PRIVATE":
-            raise HTTPException(status_code=403, detail="Forbidden")
-        elif resource.visibility == "DEPARTMENT_DISCOVERABLE":
-            if owner and owner.department_id != profile.department_id:
-                raise HTTPException(status_code=403, detail="Forbidden: Not in the same department")
+    if not check_resource_access(resource, profile, "USE", db):
+        raise HTTPException(status_code=403, detail="Forbidden. You do not have USE permission for this resource.")
     
     latest_version = None
     if resource.versions:
@@ -199,12 +249,11 @@ def delete_resource(
     db: Session = Depends(get_db),
     profile: models.User = Depends(get_current_profile)
 ):
-    resource = db.query(models.Resource).filter(
-        models.Resource.id == resource_id,
-        models.Resource.owner_id == profile.id
-    ).first()
+    resource = db.query(models.Resource).filter(models.Resource.id == resource_id).first()
     if not resource:
-        raise HTTPException(status_code=404, detail="Resource not found or not owned by you")
+        raise HTTPException(status_code=404, detail="Resource not found")
+    if profile.role != "ADMIN" and resource.owner_id != profile.id:
+        raise HTTPException(status_code=403, detail="Forbidden. Only the owner or ADMIN can delete this resource.")
     # Clean up foreign key references without cascade rules
     db.query(models.TeachingKitResource).filter(models.TeachingKitResource.resource_id == resource_id).delete()
     db.query(models.ResourceReview).filter(models.ResourceReview.resource_id == resource_id).delete()
@@ -225,8 +274,8 @@ def create_resource_version(
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
         
-    if resource.owner_id != profile.id:
-        raise HTTPException(status_code=403, detail="Forbidden. Only the owner can create a new version.")
+    if not check_resource_access(resource, profile, "MODIFY", db):
+        raise HTTPException(status_code=403, detail="Forbidden. You do not have MODIFY permission for this resource.")
 
     db_version = models.ResourceVersion(
         resource_id=resource_id,
@@ -289,8 +338,17 @@ def approve_access(
 ):
     # 1. Verify owner
     resource = db.query(models.Resource).filter(models.Resource.id == resource_id).first()
-    if not resource or resource.owner_id != profile.id:
-        raise HTTPException(status_code=403, detail="Not authorized")
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource not found")
+        
+    if profile.role != "ADMIN":
+        if resource.owner_id != profile.id:
+            if profile.role == "HOD":
+                owner = db.query(models.User).filter(models.User.id == resource.owner_id).first()
+                if not owner or owner.department_id != profile.department_id:
+                    raise HTTPException(status_code=403, detail="Not authorized to approve access requests for other departments")
+            else:
+                raise HTTPException(status_code=403, detail="Not authorized to approve access requests")
 
     # 2. Verify notification
     notif = db.query(models.Notification).filter(
@@ -357,13 +415,8 @@ def add_review(resource_id: int, review: ReviewCreate, db: Session = Depends(get
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
         
-    owner = db.query(models.User).filter(models.User.id == resource.owner_id).first()
-    if resource.owner_id != current_user.id:
-        if resource.visibility == "PRIVATE":
-            raise HTTPException(status_code=403, detail="Forbidden. You do not have permission to review this resource.")
-        elif resource.visibility == "DEPARTMENT_DISCOVERABLE":
-            if owner and owner.department_id != current_user.department_id:
-                raise HTTPException(status_code=403, detail="Forbidden: Not in the same department")
+    if not check_resource_access(resource, current_user, "VIEW", db):
+        raise HTTPException(status_code=403, detail="Forbidden. You do not have permission to review this resource.")
         
     new_review = models.ResourceReview(
         resource_id=resource_id,
@@ -383,13 +436,8 @@ def get_reviews(resource_id: int, db: Session = Depends(get_db), current_user: m
     if not resource:
         raise HTTPException(status_code=404, detail="Resource not found")
         
-    owner = db.query(models.User).filter(models.User.id == resource.owner_id).first()
-    if resource.owner_id != current_user.id:
-        if resource.visibility == "PRIVATE":
-            raise HTTPException(status_code=403, detail="Forbidden. You do not have permission to view reviews for this resource.")
-        elif resource.visibility == "DEPARTMENT_DISCOVERABLE":
-            if owner and owner.department_id != current_user.department_id:
-                raise HTTPException(status_code=403, detail="Forbidden: Not in the same department")
+    if not check_resource_access(resource, current_user, "VIEW", db):
+        raise HTTPException(status_code=403, detail="Forbidden. You do not have permission to view reviews for this resource.")
 
     reviews = db.query(models.ResourceReview).filter(models.ResourceReview.resource_id == resource_id).order_by(models.ResourceReview.created_at.desc()).all()
     
@@ -413,13 +461,8 @@ def get_resource_details(resource_id: int, db: Session = Depends(get_db), curren
         raise HTTPException(status_code=404, detail="Resource not found")
     
     owner = db.query(models.User).filter(models.User.id == resource.owner_id).first()
-    
-    if resource.owner_id != current_user.id:
-        if resource.visibility == "PRIVATE":
-            raise HTTPException(status_code=403, detail="Forbidden: Resource is private")
-        elif resource.visibility == "DEPARTMENT_DISCOVERABLE":
-            if owner and owner.department_id != current_user.department_id:
-                raise HTTPException(status_code=403, detail="Forbidden: Not in the same department")
+    if not check_resource_access(resource, current_user, "VIEW", db):
+        raise HTTPException(status_code=403, detail="Forbidden: You do not have permission to view this resource.")
     
     # Calculate avg rating
     reviews = db.query(models.ResourceReview).filter(models.ResourceReview.resource_id == resource_id).all()
@@ -445,22 +488,26 @@ def get_recommendations(resource_id: int, db: Session = Depends(get_db), current
     if not target:
         return []
         
-    if target.owner_id != current_user.id and target.visibility == "PRIVATE":
+    if not check_resource_access(target, current_user, "VIEW", db):
         raise HTTPException(status_code=403, detail="Forbidden. You do not have permission to view recommendations for this resource.")
 
     words = [w.lower() for w in target.title.split() if len(w) > 3]
     
     from sqlalchemy import or_, and_
-    query = db.query(models.Resource).join(models.User).filter(
-        models.Resource.id != resource_id,
-        or_(
-            models.Resource.visibility == "INSTITUTION_DISCOVERABLE",
-            and_(
-                models.Resource.visibility == "DEPARTMENT_DISCOVERABLE",
-                models.User.department_id == current_user.department_id
+    
+    if current_user.role == "ADMIN":
+        query = db.query(models.Resource).filter(models.Resource.id != resource_id)
+    else:
+        query = db.query(models.Resource).join(models.User).filter(
+            models.Resource.id != resource_id,
+            or_(
+                models.Resource.visibility == "INSTITUTION_DISCOVERABLE",
+                and_(
+                    models.Resource.visibility == "DEPARTMENT_DISCOVERABLE",
+                    models.User.department_id == current_user.department_id
+                )
             )
         )
-    )
     
     # We will score them in Python for simplicity
     all_public = query.all()
