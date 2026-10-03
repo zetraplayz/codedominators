@@ -1,0 +1,14 @@
+fastapi
+uvicorn
+sqlalchemy
+pydantic
+pydantic-settings
+python-dotenv
+supabase
+python-multipart
+google-genai
+openai
+PyJWT
+
+psycopg2-binary>=2.9.0
+passlib[bcrypt]

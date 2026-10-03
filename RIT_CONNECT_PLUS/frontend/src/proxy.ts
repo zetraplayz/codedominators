@@ -1,0 +1,23 @@
+import { NextResponse, type NextRequest } from 'next/server'
+
+export function proxy(request: NextRequest) {
+  const token = request.cookies.get('cp_session')?.value
+  
+  const isAuthPage = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname.startsWith('/signup')
+  
+  if (!token && !isAuthPage) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+  
+  if (token && isAuthPage) {
+    return NextResponse.redirect(new URL('/dashboard', request.url))
+  }
+  
+  return NextResponse.next()
+}
+
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|api|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
+}
