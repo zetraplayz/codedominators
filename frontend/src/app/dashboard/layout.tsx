@@ -31,8 +31,6 @@ function MaintenanceScreen() {
 function DashboardInner({ children }: { children: React.ReactNode }) {
   const { user, loading: sessionLoading } = useSession();
   const [maintenance, setMaintenance] = useState(false);
-  const [devMode, setDevMode] = useState(false);
-  const [devAnnouncement, setDevAnnouncement] = useState("");
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   useEffect(() => {
@@ -47,20 +45,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
           return {};
         })
         .then((data: Record<string, string>) => {
-          const devModeActive = data.DEVELOPER_MODE === "true";
           const maintModeActive = data.MAINTENANCE_MODE === "true";
-
-          // Dev Mode — apply/remove class based on server state, NEVER client state alone
-          if (devModeActive) {
-            document.body.classList.add("dev-mode");
-            setDevMode(true);
-            setDevAnnouncement(data.DEV_MODE_ANNOUNCEMENT || "");
-          } else {
-            // Always remove on fetch to prevent stale state after Dev Mode is disabled
-            document.body.classList.remove("dev-mode");
-            setDevMode(false);
-            setDevAnnouncement("");
-          }
 
           if (maintModeActive) {
             setMaintenance(true);
@@ -74,8 +59,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
           }
         })
         .catch(() => {
-          // On error, default to safe state — remove dev-mode class
-          document.body.classList.remove("dev-mode");
+          // On error, proceed anyway
         })
         .finally(() => setSettingsLoaded(true));
     };
@@ -102,11 +86,6 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--color-base-bg)] flex-col">
-      {devMode && (
-        <div className="bg-[#cc0000] text-white text-sm font-bold text-center py-2 px-4 shadow-md z-50 flex-shrink-0 animate-pulse-slow">
-          ⚠ DEVELOPER MODE ACTIVE ⚠ {devAnnouncement && <span className="ml-2 border-l border-white/40 pl-2 font-medium">{devAnnouncement}</span>}
-        </div>
-      )}
       <div className="flex flex-1 overflow-hidden relative">
         <Sidebar />
         <main className="flex-1 overflow-y-auto relative z-10">

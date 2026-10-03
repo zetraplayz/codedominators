@@ -54,5 +54,6 @@
   /* ── Smooth transitions for inputs ── */
   input, textarea, select {
     transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    caret-color: var(--color-base-text);
   }
 }
