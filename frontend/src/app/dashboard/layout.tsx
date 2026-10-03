@@ -61,7 +61,6 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
             setDevMode(false);
             setDevAnnouncement("");
           }
-
           if (maintModeActive) {
             setMaintenance(true);
           } else {

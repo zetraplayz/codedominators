@@ -330,13 +330,17 @@ export default function AdminControlPlane() {
     }
   };
 
+
+  useEffect(() => {
+    if (user && user.role !== "ADMIN") {
+      window.location.href = "/login";
+    }
+  }, [user]);
+
   if (!user || user.role !== "ADMIN") {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <Shield size={40} className="mx-auto opacity-20 mb-3" />
-          <p className="font-extrabold text-[var(--color-base-text)] opacity-50">Admin Access Required</p>
-        </div>
+      <div className="flex items-center justify-center h-screen bg-[var(--color-base-bg)]">
+        <Loader2 size={32} className="animate-spin text-[var(--color-base-text)] opacity-40" />
       </div>
     );
   }

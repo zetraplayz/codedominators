@@ -65,6 +65,31 @@ async def rate_limit_middleware(request: Request, call_next):
     response = await call_next(request)
     return response
 
+from app.core.database import SessionLocal
+from app.models import SystemSettings
+from starlette.concurrency import run_in_threadpool
+
+@app.middleware("http")
+async def maintenance_mode_middleware(request: Request, call_next):
+    # Exclude admin routes (they need access to disable maintenance), auth (login), and docs
+    path = request.url.path
+    if path.startswith("/api/admin") or path.startswith("/api/auth") or path.startswith("/api/public") or path.startswith("/docs") or path.startswith("/openapi.json"):
+        return await call_next(request)
+        
+    def check_maintenance():
+        db = SessionLocal()
+        try:
+            maintenance = db.query(SystemSettings).filter(SystemSettings.key == "MAINTENANCE_MODE").first()
+            return maintenance and maintenance.value == "true"
+        finally:
+            db.close()
+
+    is_maintenance = await run_in_threadpool(check_maintenance)
+    if is_maintenance:
+        return JSONResponse(status_code=503, content={"detail": "System is under maintenance."})
+        
+    return await call_next(request)
+
 # Audit Logging Middleware for critical actions
 import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -94,3 +119,14 @@ app.include_router(conversations.router, prefix="/api/conversations", tags=["Con
 @app.get("/health")
 def health_check():
     return {"status": "ok", "message": "Connect Plus API is running successfully"}
+
+@app.get("/api/public/settings")
+def get_public_settings():
+    db = SessionLocal()
+    try:
+        settings = db.query(SystemSettings).filter(
+            SystemSettings.key.in_(["MAINTENANCE_MODE", "DEVELOPER_MODE", "DEV_MODE_ANNOUNCEMENT"])
+        ).all()
+        return {s.key: s.value for s in settings}
+    finally:
+        db.close()
