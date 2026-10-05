@@ -28,7 +28,7 @@ export function GlobalSettingsManager({ children }: { children: React.ReactNode 
     };
 
     fetchPublicSettings();
-    const interval = setInterval(fetchPublicSettings, 5000);
+    const interval = setInterval(fetchPublicSettings, 60000);
     return () => clearInterval(interval);
   }, []);
 

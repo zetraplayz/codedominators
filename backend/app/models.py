@@ -38,7 +38,13 @@ class User(Base):
 
     # Relationships
     department = relationship("Department", back_populates="users", foreign_keys=[department_id])
-    resources = relationship("Resource", back_populates="owner")
+    resources = relationship("Resource", back_populates="owner", cascade="all, delete-orphan")
+    kits = relationship("TeachingKit", back_populates="owner", cascade="all, delete-orphan")
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    blocks_as_blocker = relationship("UserBlock", foreign_keys="[UserBlock.blocker_id]", cascade="all, delete-orphan")
+    blocks_as_blocked = relationship("UserBlock", foreign_keys="[UserBlock.blocked_id]", cascade="all, delete-orphan")
+    reviews_written = relationship("ResourceReview", foreign_keys="[ResourceReview.reviewer_id]", cascade="all, delete-orphan")
+    messages_sent = relationship("ConversationMessage", back_populates="sender", cascade="all, delete-orphan")
 
 
 class Resource(Base):
@@ -56,6 +62,8 @@ class Resource(Base):
     owner = relationship("User", back_populates="resources")
     versions = relationship("ResourceVersion", back_populates="resource", cascade="all, delete-orphan")
     permissions = relationship("ResourcePermission", back_populates="resource", cascade="all, delete-orphan")
+    reviews = relationship("ResourceReview", back_populates="resource", cascade="all, delete-orphan")
+    kit_links = relationship("TeachingKitResource", back_populates="resource", cascade="all, delete-orphan")
     forked_from = relationship("Resource", remote_side=[id])
 
 class ResourceVersion(Base):
@@ -104,6 +112,8 @@ class Notification(Base):
     metadata_obj = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    user = relationship("User", back_populates="notifications")
+
 class UserBlock(Base):
     __tablename__ = "user_blocks"
 
@@ -123,6 +133,8 @@ class ResourceReview(Base):
     feedback = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
+    resource = relationship("Resource", back_populates="reviews")
+
 class TeachingKit(Base):
     __tablename__ = "teaching_kits"
 
@@ -134,6 +146,9 @@ class TeachingKit(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    owner = relationship("User", back_populates="kits")
+    resources = relationship("TeachingKitResource", back_populates="kit", cascade="all, delete-orphan")
+
 class TeachingKitResource(Base):
     __tablename__ = "teaching_kit_resources"
 
@@ -141,6 +156,9 @@ class TeachingKitResource(Base):
     kit_id = Column(Integer, ForeignKey("teaching_kits.id"), nullable=False)
     resource_id = Column(Integer, ForeignKey("resources.id"), nullable=False)
     added_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    kit = relationship("TeachingKit", back_populates="resources")
+    resource = relationship("Resource", back_populates="kit_links")
 
 class SystemSettings(Base):
     __tablename__ = "system_settings"

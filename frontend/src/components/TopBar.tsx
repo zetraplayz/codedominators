@@ -65,7 +65,7 @@ export function TopBar() {
     const interval = setInterval(() => {
       fetchNotifications();
       fetchSettings();
-    }, 20000);
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 

@@ -29,6 +29,15 @@ function MaintenanceScreen() {
 }
 
 function DevModeRestrictedScreen({ announcement }: { announcement?: string }) {
+  const handleLogout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (e) {
+      // ignore
+    }
+    window.location.href = "/login";
+  };
+
   return (
     <div className="flex flex-col items-center justify-center h-screen bg-[#0d0d0d] text-white px-4">
       <div className="w-24 h-24 mb-6 rounded-3xl bg-[#1a1a1a] border border-red-600/40 flex items-center justify-center shadow-lg animate-pulse">
@@ -46,7 +55,7 @@ function DevModeRestrictedScreen({ announcement }: { announcement?: string }) {
         </div>
       )}
       <button 
-        onClick={() => { window.location.href = "/login"; }}
+        onClick={handleLogout}
         className="mt-8 px-6 py-3 rounded-xl bg-[#cc0000] hover:bg-red-700 text-white font-bold text-sm transition-all shadow-lg"
       >
         Return to Login
@@ -110,7 +119,7 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
     };
 
     fetchSettings();
-    const interval = setInterval(fetchSettings, 3000);
+    const interval = setInterval(fetchSettings, 60000);
     return () => clearInterval(interval);
   }, [sessionLoading, user, maintenance]);
 

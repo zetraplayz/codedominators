@@ -76,17 +76,22 @@ async def maintenance_mode_middleware(request: Request, call_next):
     if path.startswith("/api/admin") or path.startswith("/api/auth") or path.startswith("/api/public") or path.startswith("/docs") or path.startswith("/openapi.json"):
         return await call_next(request)
         
-    def check_maintenance():
+    def check_system_state():
         db = SessionLocal()
         try:
             maintenance = db.query(SystemSettings).filter(SystemSettings.key == "MAINTENANCE_MODE").first()
-            return maintenance and maintenance.value == "true"
+            dev_mode = db.query(SystemSettings).filter(SystemSettings.key == "DEVELOPER_MODE").first()
+            
+            is_maint = maintenance and maintenance.value == "true"
+            is_dev = dev_mode and dev_mode.value == "true"
+            return is_maint, is_dev
         finally:
             db.close()
 
-    is_maintenance = await run_in_threadpool(check_maintenance)
-    if is_maintenance:
-        return JSONResponse(status_code=503, content={"detail": "System is under maintenance."})
+    is_maintenance, is_dev_mode = await run_in_threadpool(check_system_state)
+    if is_maintenance or is_dev_mode:
+        mode_name = "maintenance" if is_maintenance else "developer mode"
+        return JSONResponse(status_code=503, content={"detail": f"System is currently in {mode_name}."})
         
     return await call_next(request)
 

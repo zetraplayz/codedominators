@@ -63,12 +63,7 @@
    Eliminates all stray text-enter cursor effects across the entire site.
    ═══════════════════════════════════════════════════════════════════ */
 
-/* 1. Default arrow cursor and no text selection everywhere */
-html, body, div, span, p, h1, h2, h3, h4, h5, h6,
-section, article, main, aside, header, nav, footer,
-table, thead, tbody, tr, th, td, ul, ol, li,
-dl, dt, dd, blockquote, figure, figcaption,
-svg, path, img, canvas, form,
+/* 1. Default arrow cursor everywhere and disable text selection by default */
 *, *::before, *::after {
   cursor: default !important;
   user-select: none !important;
@@ -76,32 +71,70 @@ svg, path, img, canvas, form,
 }
 
 /* 2. Interactive elements always show pointer */
-a, a *, 
-button, button *, 
-[role="button"], [role="button"] *, 
-select, select *, 
-summary, summary *,
+a, button, [role="button"], select, summary,
 input[type="button"], input[type="submit"], input[type="reset"],
 input[type="checkbox"], input[type="radio"], input[type="range"],
-label[for], label[for] *,
-.cursor-pointer, .cursor-pointer * {
+label, .cursor-pointer,
+a *, button *, [role="button"] * {
   cursor: pointer !important;
-  user-select: none !important;
-  -webkit-user-select: none !important;
 }
 
-/* 3. STRICTLY AND EXCLUSIVELY true text inputs get the typing/text-enter cursor */
-input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([disabled]):not([readonly]),
-textarea:not([disabled]):not([readonly]) {
+/* Subtle interactions for buttons and links */
+a, button, [role="button"] {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease !important;
+}
+
+a:hover, button:hover, [role="button"]:hover {
+  transform: translateY(-1px) !important;
+  filter: brightness(1.05) !important;
+}
+
+a:active, button:active, [role="button"]:active {
+  transform: translateY(1px) scale(0.98) !important;
+}
+
+/* 3. STRICTLY AND EXCLUSIVELY true text inputs get the typing/text-enter cursor and can be selected */
+input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+textarea,
+[contenteditable="true"] {
   cursor: text !important;
-  user-select: text !important;
-  -webkit-user-select: text !important;
+  user-select: auto !important;
+  -webkit-user-select: auto !important;
 }
 
 /* 4. Disabled states */
-[disabled], [disabled] *,
-[aria-disabled="true"], [aria-disabled="true"] *,
-input[disabled], textarea[disabled], button:disabled {
+[disabled], [aria-disabled="true"] {
   cursor: not-allowed !important;
 }
 
+/* 5. Allow standard text elements to be selectable if strictly needed, but keep default cursor */
+p, h1, h2, h3, h4, h5, h6, span, div, ul, li, table, td, th {
+  cursor: default !important;
+}
+
+/* 6. Hide Next.js Dev Toolbar in development */
+nextjs-portal,
+#__next-build-watcher,
+[data-nextjs-toast] {
+  display: none !important;
+}
+
+/* -- Global Page Transitions -- */
+@keyframes pageEnter {
+  0% { opacity: 0; transform: translateY(16px) scale(0.995); filter: blur(8px); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0px); }
+}
+
+.animate-page-enter {
+  animation: pageEnter 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* -- Splash Screen Animations -- */
+@keyframes splashLogo {
+  0% { transform: scale(0.8) translateY(20px); opacity: 0; filter: blur(10px); }
+  100% { transform: scale(1) translateY(0); opacity: 1; filter: blur(0px); }
+}
+@keyframes splashText {
+  0% { opacity: 0; transform: translateY(10px); letter-spacing: 0.2em; }
+  100% { opacity: 0.7; transform: translateY(0); letter-spacing: 0.4em; }
+}
