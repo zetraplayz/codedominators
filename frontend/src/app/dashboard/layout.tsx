@@ -1,7 +1,7 @@
 'use client';
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Sidebar from "../../components/Sidebar";
-import { AiAssistant } from "@/components/AiAssistant";
+import { TopBar } from "@/components/TopBar";
 import { SessionProvider, useSession } from "@/context/session";
 import { Loader2 } from "lucide-react";
 
@@ -28,20 +28,46 @@ function MaintenanceScreen() {
   );
 }
 
+function DevModeRestrictedScreen({ announcement }: { announcement?: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center h-screen bg-[#0d0d0d] text-white px-4">
+      <div className="w-24 h-24 mb-6 rounded-3xl bg-[#1a1a1a] border border-red-600/40 flex items-center justify-center shadow-lg animate-pulse">
+        <span className="text-4xl text-red-500 font-extrabold">⚠</span>
+      </div>
+      <h1 className="text-3xl font-extrabold text-white tracking-tight text-center">
+        Developer Control Mode Active
+      </h1>
+      <p className="mt-3 text-sm text-gray-400 text-center max-w-md">
+        An institution-level developer maintenance session is in progress. User plane operations are temporarily locked.
+      </p>
+      {announcement && (
+        <div className="mt-6 p-4 rounded-2xl bg-[#1e1e1e] border border-red-500/30 text-red-400 text-xs font-semibold max-w-md text-center">
+          {announcement}
+        </div>
+      )}
+      <button 
+        onClick={() => { window.location.href = "/login"; }}
+        className="mt-8 px-6 py-3 rounded-xl bg-[#cc0000] hover:bg-red-700 text-white font-bold text-sm transition-all shadow-lg"
+      >
+        Return to Login
+      </button>
+    </div>
+  );
+}
+
 function DashboardInner({ children }: { children: React.ReactNode }) {
   const { user, loading: sessionLoading } = useSession();
   const [maintenance, setMaintenance] = useState(false);
   const [devMode, setDevMode] = useState(false);
   const [devAnnouncement, setDevAnnouncement] = useState("");
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const prevDevMode = useRef<boolean | null>(null);
 
   useEffect(() => {
-    // Only fetch settings after session is known
     if (sessionLoading) return;
 
-
     const fetchSettings = () => {
-      fetch("/api/admin/settings", { credentials: "include" })
+      fetch("/api/public/settings", { credentials: "include" })
         .then(res => {
           if (res.ok) return res.json();
           return {};
@@ -50,39 +76,41 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
           const devModeActive = data.DEVELOPER_MODE === "true";
           const maintModeActive = data.MAINTENANCE_MODE === "true";
 
-          // Dev Mode — apply/remove class based on server state, NEVER client state alone
+          // If dev mode was active and just got disabled, redirect staff/HOD immediately to /login
+          if (prevDevMode.current === true && !devModeActive && user && user.role !== "ADMIN") {
+            window.location.href = "/login";
+            return;
+          }
+          prevDevMode.current = devModeActive;
+
+          // Dev Mode styling
           if (devModeActive) {
             document.body.classList.add("dev-mode");
             setDevMode(true);
             setDevAnnouncement(data.DEV_MODE_ANNOUNCEMENT || "");
           } else {
-            // Always remove on fetch to prevent stale state after Dev Mode is disabled
             document.body.classList.remove("dev-mode");
             setDevMode(false);
             setDevAnnouncement("");
           }
+
           if (maintModeActive) {
             setMaintenance(true);
           } else {
-            // If maintenance was lifted, we might be recovering
             if (maintenance) {
-               // Optional: trigger a session refresh to ensure everything is in sync
-               window.location.reload();
+              window.location.reload();
             }
             setMaintenance(false);
           }
         })
         .catch(() => {
-          // On error, default to safe state — remove dev-mode class
           document.body.classList.remove("dev-mode");
         })
         .finally(() => setSettingsLoaded(true));
     };
 
     fetchSettings();
-    // Poll every 5 seconds to provide "instant" state changes
-    const interval = setInterval(fetchSettings, 5000);
-
+    const interval = setInterval(fetchSettings, 3000);
     return () => clearInterval(interval);
   }, [sessionLoading, user, maintenance]);
 
@@ -92,6 +120,11 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
         <Loader2 size={32} className="animate-spin text-[var(--color-base-text)] opacity-40" />
       </div>
     );
+  }
+
+  // Developer mode restriction — non-admins cannot access the dashboard
+  if (devMode && user?.role !== "ADMIN") {
+    return <DevModeRestrictedScreen announcement={devAnnouncement} />;
   }
 
   // Maintenance gate — ADMIN bypasses, HOD/STAFF see maintenance screen
@@ -108,12 +141,12 @@ function DashboardInner({ children }: { children: React.ReactNode }) {
       )}
       <div className="flex flex-1 overflow-hidden relative">
         <Sidebar />
-        <main className="flex-1 overflow-y-auto relative z-10">
-          <div className="max-w-7xl mx-auto p-4 md:p-10">
+        <main className="flex-1 overflow-y-auto relative z-10 flex flex-col">
+          <TopBar />
+          <div className="max-w-7xl mx-auto p-4 md:p-8 flex-1 w-full">
             {children}
           </div>
         </main>
-        <AiAssistant />
       </div>
     </div>
   );

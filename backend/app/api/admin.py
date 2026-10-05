@@ -6,6 +6,9 @@ from app.core.database import get_db
 from app import models
 from app.api.auth import get_current_profile, verify_password, get_password_hash
 import uuid
+import os
+import shutil
+import datetime
 
 router = APIRouter()
 
@@ -77,6 +80,7 @@ def get_all_users(db: Session = Depends(get_db), admin: models.User = Depends(ge
         "full_name": u.full_name,
         "email": u.official_email,
         "employee_id": u.employee_id,
+        "member_number": u.member_number,
         "role": u.role,
         "department_id": u.department_id,
         "department_name": u.department.name if u.department else None,
@@ -101,11 +105,14 @@ def create_user(user: UserCreate, db: Session = Depends(get_db), admin: models.U
     if existing:
         raise HTTPException(status_code=400, detail="User with email or employee ID already exists")
         
+    user_count = db.query(models.User).count()
+    member_num = f"RCP-{user_count + 1:06d}"
     new_user = models.User(
         id=str(uuid.uuid4()),
         full_name=user.full_name,
         official_email=user.email,
         employee_id=user.employee_id,
+        member_number=member_num,
         password_hash=get_password_hash(user.password),
         role=user.role,
         department_id=user.department_id
@@ -114,7 +121,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db), admin: models.U
     db.commit()
     db.refresh(new_user)
     
-    return {"id": new_user.id, "full_name": new_user.full_name, "role": new_user.role}
+    return {"id": new_user.id, "full_name": new_user.full_name, "role": new_user.role, "member_number": new_user.member_number}
 
 
 @router.put("/users/{user_id}/role")
@@ -190,12 +197,35 @@ def update_system_setting(
     """Update a system setting. ADMIN only."""
     ALLOWED_KEYS = {
         "MAINTENANCE_MODE", "DEVELOPER_MODE", "DEV_MODE_ANNOUNCEMENT",
-        "PATCH_NOTE_VERSION", "PATCH_NOTE_CONTENT",
+        "PATCH_NOTE_VERSION", "PATCH_NOTE_CONTENT", "MODE_VERSION",
         "TURN_SERVER_URL", "TURN_SERVER_USERNAME", "TURN_SERVER_PASSWORD"
     }
     if setting.key not in ALLOWED_KEYS:
         raise HTTPException(status_code=400, detail=f"Unknown setting key. Allowed: {', '.join(ALLOWED_KEYS)}")
     
+    # Rule: When Developer Mode is enabled, save everything and create an automatic database backup
+    backup_info = None
+    if setting.key == "DEVELOPER_MODE" and setting.value.lower() == "true":
+        db.commit()
+        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        backup_dir = os.path.join(base_dir, "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        db_path = os.path.join(base_dir, "connect_plus.db")
+        if os.path.exists(db_path):
+            backup_file = os.path.join(backup_dir, f"connect_plus_backup_{ts}.db")
+            shutil.copy2(db_path, backup_file)
+            backup_info = f"Backup created: connect_plus_backup_{ts}.db"
+
+    # Always increment MODE_VERSION when toggling modes so client sessions re-sync
+    if setting.key in ["DEVELOPER_MODE", "MAINTENANCE_MODE"]:
+        mode_ver = db.query(models.SystemSettings).filter(models.SystemSettings.key == "MODE_VERSION").first()
+        new_ver = str(int(mode_ver.value) + 1) if mode_ver and mode_ver.value.isdigit() else "1"
+        if mode_ver:
+            mode_ver.value = new_ver  # type: ignore
+        else:
+            db.add(models.SystemSettings(key="MODE_VERSION", value=new_ver))
+
     existing = db.query(models.SystemSettings).filter(models.SystemSettings.key == setting.key).first()
     if existing:
         existing.value = setting.value  # type: ignore
@@ -203,7 +233,7 @@ def update_system_setting(
         new_setting = models.SystemSettings(key=setting.key, value=setting.value)
         db.add(new_setting)
     db.commit()
-    return {"message": "Setting updated", "key": setting.key, "value": setting.value}
+    return {"message": "Setting updated", "key": setting.key, "value": setting.value, "backup": backup_info}
 
 
 # -----------------

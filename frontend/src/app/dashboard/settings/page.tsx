@@ -26,6 +26,14 @@ export default function SettingsPage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
+  // Password change state
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwSaved, setPwSaved] = useState(false);
+  const [pwError, setPwError] = useState('');
+
   useEffect(() => {
     if (user) {
       // eslint-disable-next-line
@@ -96,6 +104,46 @@ export default function SettingsPage() {
     }
   };
 
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError('');
+    if (!oldPassword) {
+      setPwError('Please enter your current password');
+      return;
+    }
+    if (newPassword.length < 6) {
+      setPwError('New password must be at least 6 characters long');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwError('New passwords do not match');
+      return;
+    }
+    setPwSaving(true);
+    try {
+      const res = await fetch('/api/auth/change-password', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ old_password: oldPassword, new_password: newPassword }),
+      });
+      if (res.ok) {
+        setPwSaved(true);
+        setOldPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+        setTimeout(() => setPwSaved(false), 4000);
+      } else {
+        const error = await res.json().catch(() => ({}));
+        setPwError(error.detail || 'Failed to update password');
+      }
+    } catch {
+      setPwError('Network error while updating password');
+    } finally {
+      setPwSaving(false);
+    }
+  };
+
   const tabs = [
     { id: 'profile', label: 'Profile' },
     { id: 'notifications', label: 'Notifications' },
@@ -153,8 +201,15 @@ export default function SettingsPage() {
               <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
             </div>
             <div>
-              <p className="font-bold text-lg text-[var(--color-base-text)]">{fullName || 'Your Name'}</p>
-              <p className="text-sm text-[var(--color-base-text)] opacity-50 font-medium">
+              <div className="flex items-center gap-2">
+                <p className="font-bold text-lg text-[var(--color-base-text)]">{fullName || 'Your Name'}</p>
+                {user?.member_number && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-[var(--color-base-yellow)] text-[var(--color-base-text)] shadow-clay-btn">
+                    {user.member_number}
+                  </span>
+                )}
+              </div>
+              <p className="text-sm text-[var(--color-base-text)] opacity-60 font-medium">
                 {user?.role} · {user?.email}
               </p>
               <button
@@ -176,6 +231,19 @@ export default function SettingsPage() {
                 value={fullName}
                 onChange={e => setFullName(e.target.value)}
                 className="p-4 rounded-2xl border-none outline-none shadow-clay-pressed bg-[var(--color-base-mint)] focus:ring-2 focus:ring-[var(--color-base-text)]/30 text-[var(--color-base-text)] font-medium"
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="font-bold text-sm text-[var(--color-base-text)] flex items-center justify-between">
+                <span>Member Number</span>
+                <span className="text-[10px] uppercase font-black text-green-700 bg-green-100 px-2 py-0.5 rounded-full">Permanent Institutional ID</span>
+              </label>
+              <input
+                type="text"
+                value={user?.member_number || 'RCP-PENDING'}
+                disabled
+                className="p-4 rounded-2xl border-none outline-none shadow-clay-pressed bg-[var(--color-base-yellow)]/30 text-[var(--color-base-text)] font-black tracking-wide cursor-not-allowed"
               />
             </div>
 
@@ -334,22 +402,95 @@ export default function SettingsPage() {
 
       {/* Security Tab */}
       {activeTab === 'security' && (
-        <div className="bg-[var(--color-base-bg)] p-8 rounded-[2rem] shadow-clay-card flex flex-col gap-5">
-          <h2 className="text-2xl font-bold text-[var(--color-base-text)]">Security</h2>
+        <div className="bg-[var(--color-base-bg)] p-8 rounded-[2rem] shadow-clay-card flex flex-col gap-6">
+          <h2 className="text-2xl font-bold text-[var(--color-base-text)]">Security & Password</h2>
 
-          <div className="p-5 bg-[var(--color-base-mint)] rounded-2xl shadow-clay-pressed">
-            <p className="text-xs font-bold text-[var(--color-base-text)] opacity-50 uppercase tracking-widest mb-1">Account Email</p>
-            <p className="font-bold text-[var(--color-base-text)]">{user?.email}</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="p-5 bg-[var(--color-base-mint)] rounded-2xl shadow-clay-pressed">
+              <p className="text-xs font-bold text-[var(--color-base-text)] opacity-50 uppercase tracking-widest mb-1">Account Email</p>
+              <p className="font-bold text-[var(--color-base-text)]">{user?.email}</p>
+            </div>
+
+            <div className="p-5 bg-[var(--color-base-mint)] rounded-2xl shadow-clay-pressed">
+              <p className="text-xs font-bold text-[var(--color-base-text)] opacity-50 uppercase tracking-widest mb-1">Institutional Member Number</p>
+              <p className="font-black text-[var(--color-base-text)]">{user?.member_number || 'RCP-PENDING'}</p>
+            </div>
           </div>
 
-          <div className="p-5 bg-[var(--color-base-mint)] rounded-2xl shadow-clay-pressed">
-            <p className="text-xs font-bold text-[var(--color-base-text)] opacity-50 uppercase tracking-widest mb-1">Account Role</p>
-            <p className="font-bold text-[var(--color-base-text)]">{user?.role}</p>
-          </div>
+          <div className="mt-4 pt-6 border-t border-[var(--color-base-text)]/10">
+            <h3 className="text-lg font-bold text-[var(--color-base-text)] mb-2">Change Password</h3>
+            <p className="opacity-70 text-sm font-medium mb-6">
+              Update your account password. For newly provisioned accounts, replace your initial date-of-birth password with a strong custom credential.
+            </p>
 
-          <p className="opacity-60 font-medium text-sm text-[var(--color-base-text)]">
-            Password changes are managed by your institution administrator. Contact your HOD or Admin for assistance.
-          </p>
+            <form onSubmit={handlePasswordChange} className="flex flex-col gap-4 max-w-lg">
+              <div className="flex flex-col gap-2">
+                <label className="font-bold text-xs uppercase tracking-wider text-[var(--color-base-text)] opacity-70">
+                  Current Password
+                </label>
+                <input
+                  type="password"
+                  value={oldPassword}
+                  onChange={e => setOldPassword(e.target.value)}
+                  placeholder="Enter current or default DOB password"
+                  className="p-3.5 rounded-2xl border-none outline-none shadow-clay-pressed bg-[var(--color-base-mint)] focus:ring-2 focus:ring-[var(--color-base-text)]/30 text-[var(--color-base-text)] font-medium text-sm"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="font-bold text-xs uppercase tracking-wider text-[var(--color-base-text)] opacity-70">
+                  New Password
+                </label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  placeholder="Minimum 6 characters"
+                  className="p-3.5 rounded-2xl border-none outline-none shadow-clay-pressed bg-[var(--color-base-mint)] focus:ring-2 focus:ring-[var(--color-base-text)]/30 text-[var(--color-base-text)] font-medium text-sm"
+                  required
+                />
+              </div>
+
+              <div className="flex flex-col gap-2">
+                <label className="font-bold text-xs uppercase tracking-wider text-[var(--color-base-text)] opacity-70">
+                  Confirm New Password
+                </label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  placeholder="Re-enter new password"
+                  className="p-3.5 rounded-2xl border-none outline-none shadow-clay-pressed bg-[var(--color-base-mint)] focus:ring-2 focus:ring-[var(--color-base-text)]/30 text-[var(--color-base-text)] font-medium text-sm"
+                  required
+                />
+              </div>
+
+              {pwError && (
+                <div className="p-3.5 bg-red-100 border border-red-200 text-red-700 text-xs font-bold rounded-xl shadow-sm">
+                  {pwError}
+                </div>
+              )}
+
+              {pwSaved && (
+                <div className="p-3.5 bg-green-100 border border-green-200 text-green-700 text-xs font-bold rounded-xl shadow-sm flex items-center gap-2">
+                  <Check size={16} /> Password updated successfully!
+                </div>
+              )}
+
+              <div className="mt-2">
+                <ClayButton
+                  type="submit"
+                  disabled={pwSaving}
+                  variant="primary"
+                  className="flex items-center gap-2 px-6 py-3 font-bold text-sm justify-center"
+                >
+                  {pwSaving ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
+                  {pwSaving ? 'Updating Password...' : 'Update Password'}
+                </ClayButton>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

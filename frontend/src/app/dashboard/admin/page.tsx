@@ -12,6 +12,7 @@ import {
 interface Dept { id: number; name: string; hod_id: string | null; }
 interface UserItem {
   id: string; full_name: string; email: string; employee_id: string;
+  member_number?: string;
   role: string; department_id: number | null; department_name: string | null;
   designation?: string; created_at?: string;
 }

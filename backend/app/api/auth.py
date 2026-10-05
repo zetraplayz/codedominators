@@ -70,7 +70,17 @@ def login(user_in: UserLogin, response: Response, db: Session = Depends(get_db))
     
     token = create_access_token({"sub": user.id})
     response.set_cookie(key="cp_session", value=token, httponly=True, path="/", max_age=7*24*60*60)
-    return {"access_token": token, "token_type": "bearer", "user": {"id": user.id, "email": user.official_email}}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user": {
+            "id": user.id,
+            "email": user.official_email,
+            "name": user.full_name,
+            "role": user.role,
+            "employee_id": user.employee_id
+        }
+    }
 
 @router.post("/logout")
 def logout(response: Response):
@@ -86,6 +96,7 @@ def get_me(profile: models.User = Depends(get_current_profile)):
         "email": profile.official_email,
         "name": profile.full_name,
         "employee_id": profile.employee_id,
+        "member_number": profile.member_number,
         "role": profile.role,
         "department": profile.department.name if profile.department else None,
         "education": profile.education,
@@ -138,6 +149,7 @@ def update_me(update_data: UserUpdate, profile: models.User = Depends(get_curren
         "email": profile.official_email,
         "name": profile.full_name,
         "employee_id": profile.employee_id,
+        "member_number": profile.member_number,
         "role": profile.role,
         "department": profile.department.name if profile.department else None,
         "education": profile.education,
@@ -149,6 +161,27 @@ def update_me(update_data: UserUpdate, profile: models.User = Depends(get_curren
         "short_bio": profile.short_bio,
         "profile_photo": profile.profile_photo,
     }
+
+
+class PasswordChangeRequest(BaseModel):
+    old_password: str
+    new_password: str
+
+@router.post("/change-password")
+def change_password(
+    data: PasswordChangeRequest,
+    profile: models.User = Depends(get_current_profile),
+    db: Session = Depends(get_db)
+):
+    if not profile.password_hash or not verify_password(data.old_password, profile.password_hash):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    if len(data.new_password) < 6:
+        raise HTTPException(status_code=400, detail="New password must be at least 6 characters")
+        
+    profile.password_hash = get_password_hash(data.new_password)  # type: ignore
+    db.commit()
+    return {"detail": "Password updated successfully"}
 
 
 @router.get("/notifications")

@@ -125,7 +125,10 @@ def get_public_settings():
     db = SessionLocal()
     try:
         settings = db.query(SystemSettings).filter(
-            SystemSettings.key.in_(["MAINTENANCE_MODE", "DEVELOPER_MODE", "DEV_MODE_ANNOUNCEMENT"])
+            SystemSettings.key.in_([
+                "MAINTENANCE_MODE", "DEVELOPER_MODE", "DEV_MODE_ANNOUNCEMENT",
+                "MODE_VERSION", "PATCH_NOTE_VERSION", "PATCH_NOTE_CONTENT"
+            ])
         ).all()
         return {s.key: s.value for s in settings}
     finally:

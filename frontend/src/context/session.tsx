@@ -12,6 +12,7 @@ interface UserSession {
   education?: string;
   designation?: string;
   employee_id?: string;
+  member_number?: string;
   job_profile?: string;
   specialization?: string;
   assigned_courses?: string;

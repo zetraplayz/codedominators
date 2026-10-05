@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Bell, Check, UserCheck, UserX, Info, Gift, Loader2 } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Bell, Check, UserCheck, UserX, Info, Gift, Loader2, Sparkles, Terminal } from 'lucide-react';
 
 interface Notification {
   id: number;
@@ -32,7 +33,11 @@ function NotifIcon({ type }: { type: string }) {
 }
 
 export default function NotificationsPage() {
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get('tab') === 'patch' ? 'patch' : 'all';
+  const [activeTab, setActiveTab] = useState<'all' | 'patch'>(initialTab);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [patchNote, setPatchNote] = useState<{ version: string; content: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
 
@@ -44,7 +49,21 @@ export default function NotificationsPage() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchNotifs(); }, []);
+  const fetchPatch = () => {
+    fetch('/api/public/settings', { credentials: 'include' })
+      .then(res => res.ok ? res.json() : {})
+      .then((data: Record<string, string>) => {
+        if (data.PATCH_NOTE_VERSION && data.PATCH_NOTE_CONTENT) {
+          setPatchNote({ version: data.PATCH_NOTE_VERSION, content: data.PATCH_NOTE_CONTENT });
+        }
+      })
+      .catch(console.error);
+  };
+
+  useEffect(() => {
+    fetchNotifs();
+    fetchPatch();
+  }, []);
 
   const markAsRead = async (id: number) => {
     await fetch(`/api/auth/notifications/${id}/read`, { method: 'POST', credentials: 'include' });
@@ -97,23 +116,106 @@ export default function NotificationsPage() {
       <header className="flex items-center gap-4">
         <div className="relative">
           <div className="p-3 bg-[var(--color-base-yellow)] rounded-2xl shadow-clay-btn">
-            <Bell size={24} className="text-[var(--color-base-text)]" />
+            {activeTab === 'patch' ? (
+              <Sparkles size={24} className="text-[var(--color-base-text)]" />
+            ) : (
+              <Bell size={24} className="text-[var(--color-base-text)]" />
+            )}
           </div>
-          {unreadCount > 0 && (
+          {unreadCount > 0 && activeTab === 'all' && (
             <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-red-500 text-white text-[10px] font-extrabold flex items-center justify-center shadow-clay-btn">
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
         </div>
         <div>
-          <h1 className="text-4xl font-extrabold text-[var(--color-base-text)] tracking-tight">Notifications</h1>
+          <h1 className="text-4xl font-extrabold text-[var(--color-base-text)] tracking-tight">
+            {activeTab === 'patch' ? 'Patch Updates' : 'Notifications'}
+          </h1>
           <p className="text-[var(--color-base-text)] opacity-60 font-medium mt-1">
-            {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'} — access requests and alerts.
+            {activeTab === 'patch' 
+              ? 'Official releases and institutional notes from Code Dominator.' 
+              : `${unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'} — access requests and alerts.`}
           </p>
         </div>
       </header>
 
-      {notifications.length === 0 ? (
+      {/* Tab Switcher */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setActiveTab('all')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl font-bold text-sm transition-all ${
+            activeTab === 'all'
+              ? 'bg-[var(--color-base-mint)] shadow-clay-pressed text-[var(--color-base-text)]'
+              : 'bg-[var(--color-base-bg)] shadow-clay-btn text-[var(--color-base-text)] opacity-60 hover:opacity-100'
+          }`}
+        >
+          <Bell size={16} />
+          Alerts & Requests
+          {unreadCount > 0 && (
+            <span className="ml-1.5 px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-extrabold">
+              {unreadCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          onClick={() => setActiveTab('patch')}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl font-bold text-sm transition-all ${
+            activeTab === 'patch'
+              ? 'bg-[var(--color-base-mint)] shadow-clay-pressed text-[var(--color-base-text)]'
+              : 'bg-[var(--color-base-bg)] shadow-clay-btn text-[var(--color-base-text)] opacity-60 hover:opacity-100'
+          }`}
+        >
+          <Sparkles size={16} />
+          Patch Updates
+          {patchNote && (
+            <span className="ml-1.5 px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-extrabold">
+              v{patchNote.version}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {activeTab === 'patch' ? (
+        <div className="space-y-6">
+          {patchNote ? (
+            <div className="p-8 rounded-3xl bg-[var(--color-base-mint)] shadow-clay-card flex flex-col gap-5 border border-white/40">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-[var(--color-base-yellow)] rounded-2xl shadow-clay-btn">
+                    <Terminal size={22} className="text-[var(--color-base-text)]" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-extrabold text-[var(--color-base-text)]">RIT Connect Plus Release</h2>
+                      <span className="px-2.5 py-0.5 rounded-full bg-red-500 text-white text-xs font-extrabold">
+                        v{patchNote.version}
+                      </span>
+                    </div>
+                    <p className="text-xs font-semibold opacity-60 text-[var(--color-base-text)] mt-0.5">
+                      Published by Code Dominator · Official System Patch
+                    </p>
+                  </div>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-green-500/10 text-green-600 text-xs font-extrabold border border-green-500/20">
+                  Active Release
+                </span>
+              </div>
+
+              <div className="p-6 rounded-2xl bg-[var(--color-base-bg)] shadow-clay-pressed whitespace-pre-line text-sm font-medium text-[var(--color-base-text)] leading-relaxed">
+                {patchNote.content}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-20 bg-[var(--color-base-bg)] shadow-clay-card rounded-3xl text-[var(--color-base-text)]">
+              <Sparkles size={48} className="opacity-20 mb-4" />
+              <p className="font-bold text-lg opacity-50">No Patch Updates</p>
+              <p className="text-sm opacity-40">System is currently operating on the base production build.</p>
+            </div>
+          )}
+        </div>
+      ) : notifications.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 bg-[var(--color-base-bg)] shadow-clay-card rounded-3xl text-[var(--color-base-text)]">
           <Bell size={48} className="opacity-20 mb-4" />
           <p className="font-bold text-lg opacity-50">All caught up!</p>

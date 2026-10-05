@@ -57,3 +57,51 @@
     caret-color: var(--color-base-text);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   DEEP & FORCED CURSOR SYSTEM (HEAVY WORK MODE)
+   Eliminates all stray text-enter cursor effects across the entire site.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* 1. Default arrow cursor and no text selection everywhere */
+html, body, div, span, p, h1, h2, h3, h4, h5, h6,
+section, article, main, aside, header, nav, footer,
+table, thead, tbody, tr, th, td, ul, ol, li,
+dl, dt, dd, blockquote, figure, figcaption,
+svg, path, img, canvas, form,
+*, *::before, *::after {
+  cursor: default !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* 2. Interactive elements always show pointer */
+a, a *, 
+button, button *, 
+[role="button"], [role="button"] *, 
+select, select *, 
+summary, summary *,
+input[type="button"], input[type="submit"], input[type="reset"],
+input[type="checkbox"], input[type="radio"], input[type="range"],
+label[for], label[for] *,
+.cursor-pointer, .cursor-pointer * {
+  cursor: pointer !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+}
+
+/* 3. STRICTLY AND EXCLUSIVELY true text inputs get the typing/text-enter cursor */
+input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([disabled]):not([readonly]),
+textarea:not([disabled]):not([readonly]) {
+  cursor: text !important;
+  user-select: text !important;
+  -webkit-user-select: text !important;
+}
+
+/* 4. Disabled states */
+[disabled], [disabled] *,
+[aria-disabled="true"], [aria-disabled="true"] *,
+input[disabled], textarea[disabled], button:disabled {
+  cursor: not-allowed !important;
+}
+
